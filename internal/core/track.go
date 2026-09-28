@@ -23,6 +23,7 @@ type Track struct {
 	Created time.Time   `json:"created"`
 	Docs    string      `json:"docs"` // relative to workspace root
 	Status  string      `json:"status"`
+	Slot    int         `json:"slot"` // port slot: every configured port + Slot*port_stride
 	Repos   []TrackRepo `json:"repos"`
 }
 
@@ -142,6 +143,9 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 		Docs:    filepath.Join("docs", time.Now().Format("2006-01-02")+"_"+task),
 		Status:  StagePRD,
 	}
+	if t.Slot, err = w.freeSlot(); err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(w.trackDir(task), 0o755); err != nil {
 		return nil, err
 	}
@@ -150,7 +154,7 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 	}
 	var errs []error
 	for _, r := range o.Repos {
-		tr, err := w.addWorktree(task, r, from[r], o.Hotfix)
+		tr, err := w.addWorktree(task, r, from[r], o.Hotfix, t.Slot)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", r, err))
 			continue
@@ -170,7 +174,7 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 	return t, errors.Join(errs...)
 }
 
-func (w *Workspace) addWorktree(task, repo, from string, hotfix bool) (*TrackRepo, error) {
+func (w *Workspace) addWorktree(task, repo, from string, hotfix bool, slot int) (*TrackRepo, error) {
 	main := w.path("repos", repo)
 	base := from
 	if base == "" {
@@ -200,6 +204,9 @@ func (w *Workspace) addWorktree(task, repo, from string, hotfix bool) (*TrackRep
 	baseCommit, err := git(dest, "merge-base", "HEAD", base)
 	if err != nil {
 		baseCommit, _ = git(dest, "rev-parse", "HEAD")
+	}
+	if err := w.writeEnv(task, repo, dest, slot); err != nil {
+		return &TrackRepo{repo, branch, base, baseCommit}, fmt.Errorf("worktree created but .env failed: %w", err)
 	}
 	if setup := w.Cfg.Repos[repo].Setup; setup != "" {
 		if err := sh(dest, setup); err != nil {

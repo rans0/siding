@@ -30,7 +30,8 @@ siding repo add git@github.com:acme/web.git
 siding adapter install claude              # or: agents (instruction-only)
 
 siding new add-promo backend,web           # tracks/add-promo/{backend,web}
-cd tracks/add-promo && claude              # start your agent in the track
+siding open add-promo                      # agent in a tmux session (or foreground without tmux)
+siding ui                                  # board at http://127.0.0.1:4747
 siding ls                                  # agent submits at each gate
 siding approve add-promo                   # you pass Gate 1, later Gate 2
 siding done add-promo                      # after the work is pushed and log.md written
@@ -53,6 +54,8 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding ls` | All tracks with stage, uncommitted files and ahead/behind counts |
 | `siding submit <task>` | Agent: move the track to its next gate (Gate 1 needs `prd.md`) |
 | `siding approve <task> [--back]` | You: pass the gate, or send the track back a stage |
+| `siding open <task> [--agent cmd]` | Start the agent in the track, in tmux session `track-<task>` when tmux is installed |
+| `siding ui [--port N]` | Read-only board of all tracks by stage on `127.0.0.1` (default port 4747) |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
 | `siding adapter install <agents\|claude>` | Set up required tools and skills, write harness files into tracks |
 | `siding doctor` | Check required tools, skills and plugins |
@@ -89,10 +92,12 @@ Stages: `prd` → `GATE 1` → `build` → `GATE 2` → `ship`. The agent runs `
 [defaults]
 base = "origin/main"
 retro_max = 5
+port_stride = 100
 
 [repos.backend]
 base = "origin/develop"        # optional, overrides defaults.base
 setup = "go mod download"      # runs in each new worktree
+env_ports = ["PORT=8080", "DB_PORT=5432"]
 
 [required.tools]
 rtk = { check = "rtk init -g --show | grep -q 'Hook: rtk hook'", setup = "rtk init -g --auto-patch" }
@@ -107,7 +112,10 @@ ponytail   = { source = "github:DietrichGebert/ponytail", path = "skills/ponytai
 ```toml
 branch_prefix = "rans"         # branches become rans/<task>, rans/hotfix/<task>
 ref_only = ["docs-site"]
+agent = "claude"               # what `siding open` starts
 ```
+
+Each track gets a port slot (the lowest free one). Its worktrees get a `.env`: the main clone's `.env` with every `env_ports` key set to `port + slot * port_stride`, plus `COMPOSE_PROJECT_NAME=track-<task>`. The generated `.env` is excluded from git in that worktree. So three tracks of `web` run on 3000, 3100 and 3200.
 
 Required skills are fetched at their pinned ref by `siding adapter install`. `siding new` refuses to create a track while any required tool or skill is missing.
 
@@ -120,7 +128,6 @@ Required skills are fetched at their pinned ref by `siding adapter install`. `si
 
 ## Roadmap
 
-- **v0.2:** `open` with tmux, port allocation, read-only web board (`siding ui`)
 - **v0.3:** document templates, `report`, `pr`
 - **v0.4:** `learn`, full `doctor`, stale-fact markers
 - **v1.0:** tested Codex, Cursor and OpenCode adapters, native Windows, brew and scoop

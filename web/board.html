@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="5">
+<title>siding board</title>
+<style>
+:root {
+  --bg: #f6f5f1; --card: #fff; --text: #1d1c1a; --sub: #6b6964; --line: #e2e0da;
+  --gate: #b4531f; --gate-bg: #fbeee5; --ok: #2f6f3e;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161615; --card: #201f1d; --text: #ecebe7; --sub: #9a978f; --line: #34332f;
+          --gate: #f0935d; --gate-bg: #3a2519; --ok: #7ec98f; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
+header { display: flex; align-items: baseline; gap: 12px; padding: 16px; border-bottom: 1px solid var(--line); }
+h1 { font-size: 18px; margin: 0; }
+header span { color: var(--sub); font-size: 12px; overflow-wrap: anywhere; }
+main { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 16px; }
+@media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--sub); margin: 0 0 8px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.card.gate { border-color: var(--gate); background: var(--gate-bg); }
+.task { font-weight: 600; }
+.stage { font-size: 12px; color: var(--sub); }
+.gate .stage { color: var(--gate); font-weight: 600; }
+ul { list-style: none; padding: 0; margin: 8px 0 0; font-size: 12px; }
+li { display: flex; justify-content: space-between; gap: 8px; }
+code { font: 12px ui-monospace, monospace; }
+.clean { color: var(--ok); }
+.empty { color: var(--sub); font-size: 12px; }
+</style>
+</head>
+<body>
+<header><h1>siding</h1><span>{{.Root}}</span></header>
+<main>
+{{range .Columns}}
+<section aria-label="{{.Name}}">
+  <h2>{{.Name}} ({{len .Cards}})</h2>
+  {{range .Cards}}
+  <article class="card{{if .Gate}} gate{{end}}">
+    <div class="task">{{.Task}}{{if .Hotfix}} · hotfix{{end}}</div>
+    <div class="stage">{{.Stage}}</div>
+    <ul>
+    {{range .Repos}}
+      <li><code>{{.Name}}</code><span{{if .Clean}} class="clean"{{end}}>{{.Summary}}</span></li>
+    {{end}}
+    </ul>
+  </article>
+  {{else}}<p class="empty">none</p>{{end}}
+</section>
+{{end}}
+</main>
+</body>
+</html>

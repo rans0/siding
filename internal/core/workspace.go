@@ -55,6 +55,7 @@ type Local struct {
 	BranchPrefix string   `toml:"branch_prefix"`
 	RefOnly      []string `toml:"ref_only"`
 	Adapters     []string `toml:"adapters"`
+	Agent        string   `toml:"agent"` // command `siding open` starts; default "claude"
 }
 
 type Workspace struct {

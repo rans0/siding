@@ -3,5 +3,5 @@ package siding
 
 import "embed"
 
-//go:embed all:starter-knowledge templates
+//go:embed all:starter-knowledge templates web
 var Assets embed.FS

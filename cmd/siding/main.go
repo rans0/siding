@@ -4,11 +4,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/rans0/siding/internal/core"
+	"github.com/rans0/siding/internal/ui"
 )
 
 const usage = `siding: multi-repo, multi-task workspace manager for coding agents
@@ -20,6 +22,8 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding ls                                  all tracks
   siding submit <task>                       agent: move the track to its next gate
   siding approve <task> [--back]             you: pass the gate, or send the track back
+  siding open <task> [--agent cmd]           start the agent in the track (tmux session if available)
+  siding ui [--port N]                       read-only board on 127.0.0.1
   siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
   siding adapter install <agents|claude>     set up required tools, skills, harness files
   siding doctor                              check required tools and skills
@@ -190,6 +194,30 @@ func run(args []string) error {
 		}
 		fmt.Printf("%s: %s\n", t.Task, core.StageLabel[t.Status])
 		return nil
+
+	case "open":
+		agent := fs.String("agent", "", "agent command (default: agent in .siding.local.toml, else claude)")
+		pos, err := parse(fs, args)
+		if err != nil {
+			return err
+		}
+		if err := need(pos, 1, "open <task> [--agent cmd]"); err != nil {
+			return err
+		}
+		c, err := w.OpenCmd(pos[0], *agent)
+		if err != nil {
+			return err
+		}
+		return c.Run()
+
+	case "ui":
+		port := fs.Int("port", 4747, "port on 127.0.0.1")
+		if _, err := parse(fs, args); err != nil {
+			return err
+		}
+		addr := fmt.Sprintf("127.0.0.1:%d", *port)
+		fmt.Printf("siding board: http://%s (ctrl-c to stop)\n", addr)
+		return http.ListenAndServe(addr, ui.Handler(w))
 
 	case "done":
 		force := fs.Bool("force", false, "remove even with uncommitted or unpushed work")
