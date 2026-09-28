@@ -18,7 +18,9 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding repo ls                             repos and the tracks using them
   siding new <task> <repos> [--from ref|a=x,b=y] [--hotfix]
   siding ls                                  all tracks
-  siding done <task> [--force]               remove the track's worktrees (docs stay)
+  siding submit <task>                       agent: move the track to its next gate
+  siding approve <task> [--back]             you: pass the gate, or send the track back
+  siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
   siding adapter install <agents|claude>     set up required tools, skills, harness files
   siding doctor                              check required tools and skills
 `
@@ -144,7 +146,7 @@ func run(args []string) error {
 			return err
 		}
 		tw := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(tw, "TRACK\tREPOS\tBRANCH\tSTATUS")
+		fmt.Fprintln(tw, "TRACK\tREPOS\tBRANCH\tSTAGE\tCHANGES")
 		for _, t := range tracks {
 			var names, status []string
 			for _, s := range w.State(t) {
@@ -164,9 +166,30 @@ func run(args []string) error {
 			if len(t.Repos) > 0 {
 				branch = t.Repos[0].Branch
 			}
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", t.Task, strings.Join(names, ","), branch, st)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", t.Task, strings.Join(names, ","), branch, core.StageLabel[t.Status], st)
 		}
 		return tw.Flush()
+
+	case "submit", "approve":
+		back := fs.Bool("back", false, "send the track back instead of approving")
+		pos, err := parse(fs, args)
+		if err != nil {
+			return err
+		}
+		if err := need(pos, 1, cmd+" <task>"); err != nil {
+			return err
+		}
+		var t *core.Track
+		if cmd == "submit" {
+			t, err = w.Submit(pos[0])
+		} else {
+			t, err = w.Approve(pos[0], *back)
+		}
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s: %s\n", t.Task, core.StageLabel[t.Status])
+		return nil
 
 	case "done":
 		force := fs.Bool("force", false, "remove even with uncommitted or unpushed work")

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,6 +108,10 @@ func TestLifecycle(t *testing.T) {
 		t.Fatalf("want unpushed refusal, got %v", err)
 	}
 	run(t, wt, "push", "-q", "origin", "me/feat")
+	if err := w.Done("feat", false); err == nil || !strings.Contains(err.Error(), "log.md") {
+		t.Fatalf("want missing log.md refusal, got %v", err)
+	}
+	os.WriteFile(filepath.Join(ws, tr.Docs, "log.md"), []byte("log"), 0o644)
 	if err := w.Done("feat", false); err != nil {
 		t.Fatal(err)
 	}
@@ -139,5 +144,68 @@ func TestParseFrom(t *testing.T) {
 	}
 	if m, _ := parseFrom("v1.4.2", []string{"a", "b"}); m["b"] != "v1.4.2" {
 		t.Fatal(m)
+	}
+}
+
+// TestStages: submit/approve walk the gates; ponytail follows the stage; guard blocks approve.
+func TestStages(t *testing.T) {
+	ws := t.TempDir()
+	w := &Workspace{Root: ws, Local: Local{Adapters: []string{"claude"}}}
+	w.Cfg.Required.Skills = map[string]Skill{"ponytail": {Stages: []string{"build", "review"}, ClaudePlugin: "ponytail@ponytail"}}
+	w.Cfg.Defaults.RetroMax = 5
+	tr := &Track{Task: "s", Docs: "docs/s", Status: StagePRD}
+	os.MkdirAll(filepath.Join(ws, "tracks/s"), 0o755)
+	os.MkdirAll(filepath.Join(ws, "docs/s"), 0o755)
+	if err := w.setStage(tr); err != nil {
+		t.Fatal(err)
+	}
+	plugin := func() bool {
+		var s struct{ EnabledPlugins map[string]bool }
+		b, _ := os.ReadFile(filepath.Join(ws, "tracks/s/.claude/settings.json"))
+		json.Unmarshal(b, &s)
+		return s.EnabledPlugins["ponytail@ponytail"]
+	}
+	step := func(want string, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := w.LoadTrack("s"); got.Status != want {
+			t.Fatalf("stage = %s, want %s", got.Status, want)
+		}
+	}
+	if _, err := w.Submit("s"); err == nil {
+		t.Fatal("submit without prd.md accepted")
+	}
+	if _, err := w.Approve("s", false); err == nil {
+		t.Fatal("approve outside a gate accepted")
+	}
+	os.WriteFile(filepath.Join(ws, "docs/s/prd.md"), []byte("prd"), 0o644)
+	_, err := w.Submit("s")
+	step(StageGate1, err)
+	if plugin() {
+		t.Error("ponytail enabled before build")
+	}
+	_, err = w.Approve("s", true)
+	step(StagePRD, err)
+	w.Submit("s")
+	_, err = w.Approve("s", false)
+	step(StageBuild, err)
+	if !plugin() {
+		t.Error("ponytail disabled in build")
+	}
+	_, err = w.Submit("s")
+	step(StageGate2, err)
+	_, err = w.Approve("s", false)
+	step(StageShip, err)
+	agents, _ := os.ReadFile(filepath.Join(ws, "tracks/s/AGENTS.md"))
+	if !strings.Contains(string(agents), "Stage: ship") {
+		t.Error("AGENTS.md missing stage")
+	}
+	if w.Guard(strings.NewReader(`{"tool_input":{"command":"cd x && siding approve s"}}`)) == nil {
+		t.Error("guard allowed agent approve")
+	}
+	if err := w.Guard(strings.NewReader(`{"tool_input":{"command":"siding submit s"}}`)); err != nil {
+		t.Error(err)
 	}
 }

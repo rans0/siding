@@ -140,7 +140,7 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 		Hotfix:  o.Hotfix,
 		Created: time.Now().UTC().Truncate(time.Second),
 		Docs:    filepath.Join("docs", time.Now().Format("2006-01-02")+"_"+task),
-		Status:  "prd",
+		Status:  StagePRD,
 	}
 	if err := os.MkdirAll(w.trackDir(task), 0o755); err != nil {
 		return nil, err
@@ -269,6 +269,9 @@ func (w *Workspace) Done(task string, force bool) error {
 			problems = append(problems, fmt.Sprintf("%s: %d unpushed commit(s)", r.Name, strings.Count(out, "\n")+1))
 		}
 	}
+	if _, err := os.Stat(w.path(t.Docs, "log.md")); err != nil {
+		problems = append(problems, "no "+filepath.Join(t.Docs, "log.md")+" (run the retro skill first)")
+	}
 	if len(problems) > 0 && !force {
 		return fmt.Errorf("refusing to remove track %s (use --force to discard):\n  %s", task, strings.Join(problems, "\n  "))
 	}
@@ -297,13 +300,13 @@ func (w *Workspace) WriteAgentFiles(t *Track) error {
 		Path, Notes string
 	}
 	data := struct {
-		Task, Root, Docs string
-		Hotfix           bool
-		RetroMax         int
-		Repos            []repoView
-		Rules            []string
-		Skills           []skillRef
-	}{Task: t.Task, Root: w.Root, Docs: w.path(t.Docs), Hotfix: t.Hotfix, RetroMax: w.Cfg.Defaults.RetroMax}
+		Task, Root, Docs, Stage string
+		Hotfix                  bool
+		RetroMax                int
+		Repos                   []repoView
+		Rules                   []string
+		Skills                  []skillRef
+	}{Task: t.Task, Stage: StageLabel[t.Status], Root: w.Root, Docs: w.path(t.Docs), Hotfix: t.Hotfix, RetroMax: w.Cfg.Defaults.RetroMax}
 
 	for _, r := range t.Repos {
 		notes, _ := os.ReadFile(w.path("knowledge", "repos", r.Name+".md"))

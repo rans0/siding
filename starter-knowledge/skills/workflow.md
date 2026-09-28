@@ -7,4 +7,4 @@ Core loop between Gate 1 and Gate 2.
 3. **Execute.** Follow the plan. Update `plan.md` if reality differs.
 4. **Check.** Run each repo's tests, linters and build. Record commands and results in `testing.md`.
 5. **Edge cases again.** Re-check the list from step 2 against the finished code.
-6. **Summarize.** Stop at Gate 2: report what changed per repo, what was tested, what is left. Do not commit.
+6. **Summarize.** Run `siding submit <task>` and stop at Gate 2: report what changed per repo, what was tested, what is left. Do not commit.

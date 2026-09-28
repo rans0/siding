@@ -31,8 +31,9 @@ siding adapter install claude              # or: agents (instruction-only)
 
 siding new add-promo backend,web           # tracks/add-promo/{backend,web}
 cd tracks/add-promo && claude              # start your agent in the track
-siding ls
-siding done add-promo                      # after the work is pushed
+siding ls                                  # agent submits at each gate
+siding approve add-promo                   # you pass Gate 1, later Gate 2
+siding done add-promo                      # after the work is pushed and log.md written
 ```
 
 Production hotfix from a tag, alongside other tracks on the same repo:
@@ -49,8 +50,10 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding repo add <url> [--ref-only]` | Clone into `repos/`; `--ref-only` repos can't be used in tracks |
 | `siding repo ls` | Repos and the tracks using each |
 | `siding new <task> <repo,repo> [--from ref\|a=x,b=y] [--hotfix]` | Create a track: worktrees, setup commands, `AGENTS.md` |
-| `siding ls` | All tracks with uncommitted files and ahead/behind counts |
-| `siding done <task> [--force]` | Remove the track's worktrees; task docs are kept |
+| `siding ls` | All tracks with stage, uncommitted files and ahead/behind counts |
+| `siding submit <task>` | Agent: move the track to its next gate (Gate 1 needs `prd.md`) |
+| `siding approve <task> [--back]` | You: pass the gate, or send the track back a stage |
+| `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
 | `siding adapter install <agents\|claude>` | Set up required tools and skills, write harness files into tracks |
 | `siding doctor` | Check required tools, skills and plugins |
 
@@ -59,7 +62,9 @@ Safety behaviors:
 - An existing branch (local or on `origin`) is reused, not recreated.
 - The base commit is recorded in `.track.json` when a track is created.
 - `new` reports failures per repo and keeps the repos that succeeded.
-- `done` checks every repo before removing anything, and refuses while any has uncommitted changes or unpushed commits unless `--force` is given.
+- `done` checks everything before removing anything, and refuses while `log.md` is missing or any repo has uncommitted changes or unpushed commits, unless `--force` is given.
+
+Stages: `prd` → `GATE 1` → `build` → `GATE 2` → `ship`. The agent runs `siding submit` at each gate and stops; you run `siding approve`. In Claude Code a hook blocks the agent from running `siding approve` itself, and ponytail is enabled only in the build and review stages (applies from the next session).
 
 ## Workspace layout
 
@@ -116,7 +121,7 @@ Required skills are fetched at their pinned ref by `siding adapter install`. `si
 ## Roadmap
 
 - **v0.2:** `open` with tmux, port allocation, read-only web board (`siding ui`)
-- **v0.3:** document templates, gate tracking, `report`, `pr`
+- **v0.3:** document templates, `report`, `pr`
 - **v0.4:** `learn`, full `doctor`, stale-fact markers
 - **v1.0:** tested Codex, Cursor and OpenCode adapters, native Windows, brew and scoop
 

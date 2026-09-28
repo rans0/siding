@@ -66,12 +66,12 @@ func (w *Workspace) AdapterInstall(name string) error {
 
 const claudeCommand = `---
 description: Run a siding workspace command for this track
-argument-hint: <ls|report|pr|done> [args]
+argument-hint: <ls|submit|done> [args]
 allowed-tools: Bash(siding:*)
 ---
 Run in the shell: ` + "`siding $ARGUMENTS`" + `
 If the command needs a task name and none was given, use "%s".
-Report the output. Do not run ` + "`siding done`" + ` or ` + "`siding pr`" + ` before Gate 2 is approved.
+Report the output. Never run ` + "`siding approve`" + `: gates are the user's. Do not run ` + "`siding done`" + ` before Gate 2 is approved.
 `
 
 // installClaudePlugins registers each vendored skill checkout as a marketplace (so the
@@ -100,14 +100,15 @@ func claudeTrack(w *Workspace, t *Track) error {
 	plugins := map[string]bool{}
 	for _, s := range w.Cfg.Required.Skills {
 		if s.ClaudePlugin != "" {
-			plugins[s.ClaudePlugin] = true // ponytail: whole track, not per stage; stage tracking comes with gates (v0.3)
+			// Claude Code reads this at session start: a stage change applies to the next session.
+			plugins[s.ClaudePlugin] = slices.Contains(s.Stages, skillStage[t.Status])
 		}
 	}
 	settings, _ := json.MarshalIndent(map[string]any{
 		"enabledPlugins": plugins,
 		"hooks": map[string]any{
 			"PreToolUse": []any{map[string]any{
-				"matcher": "Edit|MultiEdit|Write|NotebookEdit",
+				"matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
 				"hooks":   []any{map[string]any{"type": "command", "command": "siding guard"}},
 			}},
 		},
@@ -126,16 +127,21 @@ func claudeTrack(w *Workspace, t *Track) error {
 }
 
 // Guard reads a Claude Code PreToolUse payload and returns an error if the edit
-// targets the workspace's main clones.
+// targets the workspace's main clones, or a shell command tries to pass a gate.
 func (w *Workspace) Guard(payload io.Reader) error {
 	var in struct {
 		ToolInput struct {
 			FilePath     string `json:"file_path"`
 			NotebookPath string `json:"notebook_path"`
+			Command      string `json:"command"`
 		} `json:"tool_input"`
 	}
 	if err := json.NewDecoder(payload).Decode(&in); err != nil {
 		return nil // not ours to judge
+	}
+	// ponytail: substring match, a determined agent can obfuscate; it guards against mistakes, not malice.
+	if strings.Contains(in.ToolInput.Command, "siding approve") {
+		return fmt.Errorf("siding: gates are approved by the user, not the agent; run `siding submit` and stop")
 	}
 	p := in.ToolInput.FilePath + in.ToolInput.NotebookPath
 	if p == "" {

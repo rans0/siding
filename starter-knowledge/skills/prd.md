@@ -10,4 +10,4 @@ Write `prd.md` in the task docs folder with:
 - **Acceptance**: observable checks that prove it is done.
 - **Open questions**.
 
-Then **stop**. Do not write code, plans or branches until the user approves the PRD (Gate 1).
+Then run `siding submit <task>` and **stop**. Do not write code, plans or branches until the user approves the PRD (Gate 1).

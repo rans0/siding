@@ -1,6 +1,6 @@
 # retro
 
-Runs before `siding done`.
+Runs before `siding done`, which refuses to remove the track until `log.md` exists.
 
 1. Write `log.md` in the task docs folder: what was built, decisions, anything surprising.
 2. Propose at most N lessons (N is in AGENTS.md; zero is fine) as files in `knowledge/inbox/`, one per file, named `<date>_<task>_<n>.md`:

@@ -1,4 +1,4 @@
-- Two gates. Stop after `prd.md` for approval (Gate 1). Stop again with the uncommitted diff (Gate 2). Never commit, push or open PRs yourself before Gate 2 is approved.
+- Two gates. After `prd.md`, run `siding submit <task>` and stop (Gate 1). After review, run `siding submit <task>` again and stop with the uncommitted diff (Gate 2). Never commit, push or open PRs yourself before Gate 2 is approved.
 - Stay in scope: only the repos listed in this track, only what `prd.md` covers.
 - Prove it works: run the repo's tests and record the evidence in `testing.md`.
 - Propose, never write, permanent knowledge: lessons go to `knowledge/inbox/` only.
