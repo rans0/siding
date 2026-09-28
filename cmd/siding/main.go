@@ -27,6 +27,7 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding ui [--port N]                       board on 127.0.0.1
   siding report <task>                       base, commits and diffstat per repo
   siding pr <task>                           after Gate 2: commit, push, open a PR per repo (needs gh)
+  siding review <task>                       deep-review a finished task: report, then fix through the gates
   siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
   siding adapter install <harness>           agents|claude|codex|cursor|opencode: tools, skills, harness files
   siding learn                               review knowledge/inbox: accept, edit, skip, delete
@@ -276,6 +277,20 @@ func run(args []string) error {
 			}
 		}
 		return nil
+
+	case "review":
+		pos, err := parse(fs, args)
+		if err != nil {
+			return err
+		}
+		if err := need(pos, 1, "review <task>"); err != nil {
+			return err
+		}
+		t, err := w.Review(pos[0])
+		if t != nil {
+			fmt.Printf("review track ready: %s/tracks/%s\nnext: siding open %s\n", w.Root, t.Task, t.Task)
+		}
+		return err
 
 	case "done":
 		force := fs.Bool("force", false, "remove even with uncommitted or unpushed work")

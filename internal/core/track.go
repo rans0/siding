@@ -25,6 +25,7 @@ type Track struct {
 	Status  string      `json:"status"`
 	Slot    int         `json:"slot"` // port slot: every configured port + Slot*port_stride
 	Repos   []TrackRepo `json:"repos"`
+	Review  *Track      `json:"review,omitempty"` // the finished task this track reviews
 }
 
 type TrackRepo struct {
@@ -32,12 +33,14 @@ type TrackRepo struct {
 	Branch     string `json:"branch"`
 	Base       string `json:"base"`
 	BaseCommit string `json:"base_commit"`
+	Head       string `json:"head,omitempty"` // branch tip, recorded by done
 }
 
 type NewOpts struct {
 	Repos  []string
 	From   string // "ref" for all repos, or "a=x,b=y" per repo
 	Hotfix bool
+	Review *Track
 }
 
 func (w *Workspace) trackDir(task string) string { return w.path("tracks", task) }
@@ -142,6 +145,7 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 		Created: time.Now().UTC().Truncate(time.Second),
 		Docs:    filepath.Join("docs", time.Now().Format("2006-01-02")+"_"+task),
 		Status:  StagePRD,
+		Review:  o.Review,
 	}
 	if t.Slot, err = w.freeSlot(); err != nil {
 		return nil, err
@@ -206,11 +210,11 @@ func (w *Workspace) addWorktree(task, repo, from string, hotfix bool, slot int) 
 		baseCommit, _ = git(dest, "rev-parse", "HEAD")
 	}
 	if err := w.writeEnv(task, repo, dest, slot); err != nil {
-		return &TrackRepo{repo, branch, base, baseCommit}, fmt.Errorf("worktree created but .env failed: %w", err)
+		return &TrackRepo{Name: repo, Branch: branch, Base: base, BaseCommit: baseCommit}, fmt.Errorf("worktree created but .env failed: %w", err)
 	}
 	if setup := w.Cfg.Repos[repo].Setup; setup != "" {
 		if err := sh(dest, setup); err != nil {
-			return &TrackRepo{repo, branch, base, baseCommit}, fmt.Errorf("worktree created but setup failed: %w", err)
+			return &TrackRepo{Name: repo, Branch: branch, Base: base, BaseCommit: baseCommit}, fmt.Errorf("worktree created but setup failed: %w", err)
 		}
 	}
 	return &TrackRepo{Name: repo, Branch: branch, Base: base, BaseCommit: baseCommit}, nil
@@ -282,6 +286,14 @@ func (w *Workspace) Done(task string, force bool) error {
 	if len(problems) > 0 && !force {
 		return fmt.Errorf("refusing to remove track %s (use --force to discard):\n  %s", task, strings.Join(problems, "\n  "))
 	}
+	// Keep the track's record with its docs so `siding review` can find the commits later.
+	for i, r := range t.Repos {
+		t.Repos[i].Head, _ = git(filepath.Join(w.trackDir(task), r.Name), "rev-parse", "HEAD")
+	}
+	b, _ := json.MarshalIndent(t, "", "  ")
+	if err := os.WriteFile(w.path(t.Docs, "track.json"), append(b, '\n'), 0o644); err != nil {
+		return err
+	}
 	for _, r := range t.Repos {
 		dir := filepath.Join(w.trackDir(task), r.Name)
 		args := []string{"worktree", "remove", dir}
@@ -298,6 +310,31 @@ func (w *Workspace) Done(task string, force bool) error {
 	return os.RemoveAll(w.trackDir(task))
 }
 
+// Review starts track review-<task> on the latest base of the repos a finished task touched.
+// The agent reports first (review.md), turns the findings into prd.md, then fixes through the usual gates.
+func (w *Workspace) Review(task string) (*Track, error) {
+	if err := validName("task", task); err != nil {
+		return nil, err
+	}
+	found, _ := filepath.Glob(w.path("docs", "????-??-??_"+task, "track.json"))
+	if len(found) == 0 {
+		return nil, fmt.Errorf("no finished task %q (docs/*_%s/track.json is written by `siding done`)", task, task)
+	}
+	b, err := os.ReadFile(found[len(found)-1]) // latest date wins
+	if err != nil {
+		return nil, err
+	}
+	var orig Track
+	if err := json.Unmarshal(b, &orig); err != nil {
+		return nil, err
+	}
+	var repos []string
+	for _, r := range orig.Repos {
+		repos = append(repos, r.Name)
+	}
+	return w.New("review-"+task, NewOpts{Repos: repos, Review: &orig})
+}
+
 type skillRef struct{ Stage, Name, Path string }
 
 // WriteAgentFiles generates AGENTS.md (and harness files for installed adapters) in the track.
@@ -308,12 +345,13 @@ func (w *Workspace) WriteAgentFiles(t *Track) error {
 	}
 	data := struct {
 		Task, Root, Docs, Stage string
+		Review                  *Track
 		Hotfix                  bool
 		RetroMax                int
 		Repos                   []repoView
 		Rules                   []string
 		Skills                  []skillRef
-	}{Task: t.Task, Stage: StageLabel[t.Status], Root: w.Root, Docs: w.path(t.Docs), Hotfix: t.Hotfix, RetroMax: w.Cfg.Defaults.RetroMax}
+	}{Task: t.Task, Stage: StageLabel[t.Status], Root: w.Root, Docs: w.path(t.Docs), Hotfix: t.Hotfix, Review: t.Review, RetroMax: w.Cfg.Defaults.RetroMax}
 
 	for _, r := range t.Repos {
 		notes, _ := os.ReadFile(w.path("knowledge", "repos", r.Name+".md"))
@@ -367,6 +405,9 @@ func (w *Workspace) skillsFor(t *Track) []skillRef {
 		}
 	}
 	required("plan")
+	if t.Review != nil {
+		add("plan", "deep-review", k("deep-review"))
+	}
 	add("plan", "prd", k("prd"))
 	add("build", "workflow", k("workflow"))
 	add("build", "tdd", k("tdd"))

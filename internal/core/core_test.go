@@ -127,6 +127,33 @@ func TestLifecycle(t *testing.T) {
 		t.Fatal("docs removed")
 	}
 
+	// review: a finished task gets a review track that reports before Gate 1
+	if _, err := w.Review("nope"); err == nil {
+		t.Fatal("review of unknown task accepted")
+	}
+	rv, err := w.Review("feat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := gitT(t, filepath.Join(ws, "repos", "app"), "rev-parse", "me/feat")
+	agents, _ = os.ReadFile(filepath.Join(ws, "tracks/review-feat/AGENTS.md"))
+	for _, want := range []string{"Review target: feat", tr.Repos[0].BaseCommit + ".." + head, filepath.Join("knowledge", "skills", "deep-review.md")} {
+		if !strings.Contains(string(agents), want) {
+			t.Errorf("review AGENTS.md missing %q", want)
+		}
+	}
+	os.WriteFile(filepath.Join(ws, rv.Docs, "prd.md"), []byte("prd"), 0o644)
+	if _, err := w.Submit("review-feat"); err == nil || !strings.Contains(err.Error(), "review.md") {
+		t.Fatalf("submit without review.md: %v", err)
+	}
+	os.WriteFile(filepath.Join(ws, rv.Docs, "review.md"), []byte("ok"), 0o644)
+	if _, err := w.Submit("review-feat"); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Done("review-feat", true); err != nil {
+		t.Fatal(err)
+	}
+
 	// re-creating reuses the existing branch with its commit
 	if _, err := w.New("feat", NewOpts{Repos: []string{"app"}}); err != nil {
 		t.Fatal(err)

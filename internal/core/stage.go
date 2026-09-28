@@ -36,8 +36,14 @@ func (w *Workspace) Submit(task string) (*Track, error) {
 	}
 	switch t.Status {
 	case StagePRD:
-		if _, err := os.Stat(w.path(t.Docs, "prd.md")); err != nil {
-			return nil, fmt.Errorf("write %s first", w.path(t.Docs, "prd.md"))
+		need := []string{"prd.md"}
+		if t.Review != nil {
+			need = []string{"review.md", "prd.md"}
+		}
+		for _, f := range need {
+			if _, err := os.Stat(w.path(t.Docs, f)); err != nil {
+				return nil, fmt.Errorf("write %s first", w.path(t.Docs, f))
+			}
 		}
 		t.Status = StageGate1
 	case StageBuild:

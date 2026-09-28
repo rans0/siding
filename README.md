@@ -51,6 +51,8 @@ siding done add-promo                      # after log.md is written
 7. **Retro.** The agent writes `log.md` and lesson proposals to `knowledge/inbox/`. Review them with `siding learn` or on the board's Inbox.
 8. **Clean up.** After the PRs are merged, `siding done add-promo` removes the worktrees. Docs stay.
 
+Later, to deep-review a finished task: `siding review add-promo` creates track `review-add-promo` on the latest base of the same repos, with the task's commit range and docs in `AGENTS.md`. The agent writes `review.md` (likely issues, repo patterns, PRD still met, performance, tech debt; each finding with severity, `file:line` and a fix), turns the findings into `prd.md` and stops at Gate 1. You pick what gets fixed; the fixes then follow the normal build, Gate 2 and PR flow. `done` keeps a `track.json` in the task docs so this works after the worktrees are gone.
+
 Several tracks can run at once, each in its own terminal, on its own ports. If something looks wrong, run `siding doctor`.
 
 Production hotfix from a tag, alongside other tracks on the same repo:
@@ -74,6 +76,7 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding report <task>` | Base, commits since base and diffstat per repo |
 | `siding pr <task>` | After Gate 2: commit, push and open a PR per repo with `gh`; title and body from `prd.md` |
 | `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track diff, docs, live terminal, gate buttons, Inbox and Health |
+| `siding review <task>` | Deep-review a finished task on the latest base: report first, then fix through the gates |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
 | `siding adapter install <agents\|claude\|codex\|cursor\|opencode>` | Set up required tools and skills, write harness files into tracks |
 | `siding learn` | Review `knowledge/inbox/` one proposal at a time: accept, edit, skip or delete |
@@ -113,11 +116,11 @@ Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified
 ├── .siding.local.toml     # per machine: branch prefix, ref-only repos, adapters (gitignored)
 ├── repos/                 # main clones, never edited
 ├── tracks/<task>/         # AGENTS.md, .track.json, one worktree per repo
-├── docs/<date>_<task>/    # prd.md, plan.md, testing.md, log.md; survives `done`
+├── docs/<date>_<task>/    # prd.md, plan.md, testing.md, log.md, track.json; survives `done`
 ├── templates/             # starting points for those four docs
 ├── knowledge/
 │   ├── rules/             # always loaded into AGENTS.md
-│   ├── skills/            # loaded per stage: prd, workflow, tdd, review, hotfix, cross-repo, retro
+│   ├── skills/            # loaded per stage: prd, workflow, tdd, review, hotfix, cross-repo, retro, deep-review
 │   ├── repos/<repo>.md    # per-repo facts, included in AGENTS.md
 │   └── inbox/             # lesson proposals from retros
 └── .siding/vendor/        # pinned upstream skills

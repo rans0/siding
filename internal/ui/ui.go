@@ -102,7 +102,7 @@ func Handler(w *core.Workspace) http.Handler {
 			reports = append(reports, repoReport{rep, classify(d)})
 		}
 		var docs []doc
-		for _, name := range []string{"prd.md", "plan.md", "testing.md", "log.md"} {
+		for _, name := range []string{"review.md", "prd.md", "plan.md", "testing.md", "log.md"} {
 			if b, err := os.ReadFile(filepath.Join(w.Root, t.Docs, name)); err == nil {
 				docs = append(docs, doc{name, string(b)})
 			}
