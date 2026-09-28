@@ -34,7 +34,8 @@ siding open add-promo                      # agent in a tmux session (or foregro
 siding ui                                  # board at http://127.0.0.1:4747
 siding ls                                  # agent submits at each gate
 siding approve add-promo                   # you pass Gate 1, later Gate 2
-siding done add-promo                      # after the work is pushed and log.md written
+siding pr add-promo                        # after Gate 2: commit, push, one PR per repo
+siding done add-promo                      # after log.md is written
 ```
 
 Production hotfix from a tag, alongside other tracks on the same repo:
@@ -55,7 +56,9 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding submit <task>` | Agent: move the track to its next gate (Gate 1 needs `prd.md`) |
 | `siding approve <task> [--back]` | You: pass the gate, or send the track back a stage |
 | `siding open <task> [--agent cmd]` | Start the agent in the track, in tmux session `track-<task>` when tmux is installed |
-| `siding ui [--port N]` | Read-only board of all tracks by stage on `127.0.0.1` (default port 4747) |
+| `siding report <task>` | Base, commits since base and diffstat per repo |
+| `siding pr <task>` | After Gate 2: commit, push and open a PR per repo with `gh`; title and body from `prd.md` |
+| `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track diff, docs, terminal snapshot, gate buttons |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
 | `siding adapter install <agents\|claude>` | Set up required tools and skills, write harness files into tracks |
 | `siding doctor` | Check required tools, skills and plugins |
@@ -69,6 +72,8 @@ Safety behaviors:
 
 Stages: `prd` → `GATE 1` → `build` → `GATE 2` → `ship`. The agent runs `siding submit` at each gate and stops; you run `siding approve`. In Claude Code a hook blocks the agent from running `siding approve` itself, and ponytail is enabled only in the build and review stages (applies from the next session).
 
+The board keeps no state of its own and binds to `127.0.0.1` only. Gate buttons call the same code as `siding approve`, protected by a per-server token. The terminal view is a snapshot of the `track-<task>` tmux session refreshed every 2 seconds, not an interactive terminal.
+
 ## Workspace layout
 
 ```
@@ -78,6 +83,7 @@ Stages: `prd` → `GATE 1` → `build` → `GATE 2` → `ship`. The agent runs `
 ├── repos/                 # main clones, never edited
 ├── tracks/<task>/         # AGENTS.md, .track.json, one worktree per repo
 ├── docs/<date>_<task>/    # prd.md, plan.md, testing.md, log.md; survives `done`
+├── templates/             # starting points for those four docs
 ├── knowledge/
 │   ├── rules/             # always loaded into AGENTS.md
 │   ├── skills/            # loaded per stage: prd, workflow, tdd, review, hotfix, cross-repo, retro
@@ -128,7 +134,6 @@ Required skills are fetched at their pinned ref by `siding adapter install`. `si
 
 ## Roadmap
 
-- **v0.3:** document templates, `report`, `pr`
 - **v0.4:** `learn`, full `doctor`, stale-fact markers
 - **v1.0:** tested Codex, Cursor and OpenCode adapters, native Windows, brew and scoop
 

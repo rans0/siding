@@ -92,6 +92,10 @@ func Init(dir string) error {
 	if err := os.CopyFS(filepath.Join(dir, "knowledge"), starter); err != nil {
 		return err
 	}
+	docTemplates, _ := fs.Sub(siding.Assets, "templates/docs")
+	if err := os.CopyFS(filepath.Join(dir, "templates"), docTemplates); err != nil {
+		return err
+	}
 	tmpl, _ := siding.Assets.ReadFile("templates/siding.toml")
 	files := map[string]string{
 		configFile:                 string(tmpl),

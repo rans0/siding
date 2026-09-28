@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.T.Task}} · siding</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header><h1><a href="/">siding</a> / {{.T.Task}}</h1><span>{{.Stage}}</span></header>
+<div class="detail">
+{{with .Error}}<p class="err" role="alert">{{.}}</p>{{end}}
+{{if .AtGate}}
+<section class="gatebar" aria-label="Gate decision">
+  <strong>{{.Stage}}</strong>
+  <form method="post" action="/t/{{.T.Task}}/approve"><input type="hidden" name="token" value="{{.Token}}"><button class="primary">Approve</button></form>
+  <form method="post" action="/t/{{.T.Task}}/back"><input type="hidden" name="token" value="{{.Token}}"><button>Send back</button></form>
+</section>
+{{end}}
+
+<section>
+  <h2>Terminal</h2>
+  {{if .HasTerminal}}<iframe src="/t/{{.T.Task}}/terminal" title="Agent terminal for {{.T.Task}}"></iframe>
+  {{else}}<p class="empty">No tmux session <code>track-{{.T.Task}}</code>. Start one with <code>siding open {{.T.Task}}</code>.</p>{{end}}
+</section>
+
+<section>
+  <h2>Repos</h2>
+  {{range .Reports}}
+  <details open>
+    <summary>{{.R.Name}} · <code>{{.R.Branch}}</code> from <code>{{.R.Base}}</code> · {{len .R.Commits}} commit(s)</summary>
+    {{with .R.Err}}<p class="err">{{.}}</p>{{end}}
+    {{if .R.DiffStat}}<pre>{{.R.DiffStat}}</pre>{{end}}
+    {{if .Diff}}<details><summary>Diff</summary><pre>{{range .Diff}}<span class="{{.Class}}">{{.Text}}</span>
+{{end}}</pre></details>{{else}}<p class="empty">No changes.</p>{{end}}
+  </details>
+  {{end}}
+</section>
+
+<section>
+  <h2>Docs</h2>
+  {{range .Docs}}
+  <details{{if eq .Name "prd.md"}} open{{end}}><summary>{{.Name}}</summary><pre class="doc">{{.Body}}</pre></details>
+  {{else}}<p class="empty">No docs yet in <code>{{.T.Docs}}</code>.</p>{{end}}
+</section>
+</div>
+</body>
+</html>

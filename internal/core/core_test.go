@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func run(t *testing.T, dir string, args ...string) string {
+func gitT(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	out, err := git(dir, args...)
 	if err != nil {
@@ -28,11 +28,11 @@ func TestLifecycle(t *testing.T) {
 	// upstream bare repo with one commit on main
 	src := filepath.Join(tmp, "src")
 	os.MkdirAll(src, 0o755)
-	run(t, src, "init", "-q", "-b", "main")
+	gitT(t, src, "init", "-q", "-b", "main")
 	os.WriteFile(filepath.Join(src, "a.txt"), []byte("a"), 0o644)
-	run(t, src, "add", ".")
-	run(t, src, "commit", "-qm", "init")
-	run(t, tmp, "clone", "-q", "--bare", src, "app.git")
+	gitT(t, src, "add", ".")
+	gitT(t, src, "commit", "-qm", "init")
+	gitT(t, tmp, "clone", "-q", "--bare", src, "app.git")
 
 	ws := filepath.Join(tmp, "ws")
 	if err := Init(ws); err != nil {
@@ -66,10 +66,10 @@ func TestLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	wt := filepath.Join(ws, "tracks/feat/app")
-	if tr.Repos[0].Branch != "me/feat" || run(t, wt, "branch", "--show-current") != "me/feat" {
+	if tr.Repos[0].Branch != "me/feat" || gitT(t, wt, "branch", "--show-current") != "me/feat" {
 		t.Fatalf("branch = %q", tr.Repos[0].Branch)
 	}
-	if tr.Repos[0].BaseCommit != run(t, src, "rev-parse", "HEAD") {
+	if tr.Repos[0].BaseCommit != gitT(t, src, "rev-parse", "HEAD") {
 		t.Fatal("base commit not recorded")
 	}
 	if _, err := os.Stat(filepath.Join(wt, ".setup-ran")); err != nil {
@@ -102,12 +102,12 @@ func TestLifecycle(t *testing.T) {
 	if err := w.Done("feat", false); err == nil || !strings.Contains(err.Error(), "uncommitted") {
 		t.Fatalf("want uncommitted refusal, got %v", err)
 	}
-	run(t, wt, "add", "b.txt")
-	run(t, wt, "commit", "-qm", "b")
+	gitT(t, wt, "add", "b.txt")
+	gitT(t, wt, "commit", "-qm", "b")
 	if err := w.Done("feat", false); err == nil || !strings.Contains(err.Error(), "unpushed") {
 		t.Fatalf("want unpushed refusal, got %v", err)
 	}
-	run(t, wt, "push", "-q", "origin", "me/feat")
+	gitT(t, wt, "push", "-q", "origin", "me/feat")
 	if err := w.Done("feat", false); err == nil || !strings.Contains(err.Error(), "log.md") {
 		t.Fatalf("want missing log.md refusal, got %v", err)
 	}
@@ -211,5 +211,24 @@ func TestStages(t *testing.T) {
 	}
 	if err := w.Guard(strings.NewReader(`{"tool_input":{"command":"siding submit s"}}`)); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestPRGateAndTitle(t *testing.T) {
+	ws := t.TempDir()
+	w := &Workspace{Root: ws}
+	os.MkdirAll(filepath.Join(ws, "tracks/p"), 0o755)
+	w.saveTrack(&Track{Task: "p", Status: StageGate2, Docs: "docs/p"})
+	if _, err := w.PR("p"); err == nil || !strings.Contains(err.Error(), "Gate 2") {
+		t.Fatalf("pr before approval: %v", err)
+	}
+	prd := filepath.Join(ws, "prd.md")
+	os.WriteFile(prd, []byte("# <Title: one line>\n"), 0o644)
+	if got := prTitle(prd, "p"); got != "p" {
+		t.Fatalf("placeholder title used: %q", got)
+	}
+	os.WriteFile(prd, []byte("intro\n# Add promo codes\n"), 0o644)
+	if got := prTitle(prd, "p"); got != "Add promo codes" {
+		t.Fatalf("title = %q", got)
 	}
 }

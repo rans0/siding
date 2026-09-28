@@ -24,6 +24,8 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding approve <task> [--back]             you: pass the gate, or send the track back
   siding open <task> [--agent cmd]           start the agent in the track (tmux session if available)
   siding ui [--port N]                       read-only board on 127.0.0.1
+  siding report <task>                       base, commits and diffstat per repo
+  siding pr <task>                           after Gate 2: commit, push, open a PR per repo (needs gh)
   siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
   siding adapter install <agents|claude>     set up required tools, skills, harness files
   siding doctor                              check required tools and skills
@@ -218,6 +220,57 @@ func run(args []string) error {
 		addr := fmt.Sprintf("127.0.0.1:%d", *port)
 		fmt.Printf("siding board: http://%s (ctrl-c to stop)\n", addr)
 		return http.ListenAndServe(addr, ui.Handler(w))
+
+	case "report", "pr":
+		pos, err := parse(fs, args)
+		if err != nil {
+			return err
+		}
+		if err := need(pos, 1, cmd+" <task>"); err != nil {
+			return err
+		}
+		if cmd == "pr" {
+			res, err := w.PR(pos[0])
+			if err != nil {
+				return err
+			}
+			failed := 0
+			for _, r := range res {
+				if r.Err != nil {
+					failed++
+					fmt.Printf("%-12s FAILED %s: %v\n", r.Repo, r.Note, r.Err)
+					continue
+				}
+				fmt.Printf("%-12s %s %s\n", r.Repo, r.Note, r.URL)
+			}
+			if failed > 0 {
+				return fmt.Errorf("%d repo(s) failed", failed)
+			}
+			return nil
+		}
+		t, err := w.LoadTrack(pos[0])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("track %s · %s\n", t.Task, core.StageLabel[t.Status])
+		for _, r := range w.Report(t) {
+			fmt.Printf("\n## %s  %s  base %s (%.7s)\n", r.Name, r.Branch, r.Base, r.BaseCommit)
+			if r.Err != nil {
+				fmt.Println("error:", r.Err)
+				continue
+			}
+			fmt.Printf("%d commit(s)\n", len(r.Commits))
+			for _, c := range r.Commits {
+				fmt.Println("  " + c)
+			}
+			if r.DiffStat != "" {
+				fmt.Println(r.DiffStat)
+			}
+			for _, u := range r.Untracked {
+				fmt.Println("  untracked:", u)
+			}
+		}
+		return nil
 
 	case "done":
 		force := fs.Bool("force", false, "remove even with uncommitted or unpushed work")

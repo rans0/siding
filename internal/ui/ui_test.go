@@ -28,6 +28,32 @@ func TestBoard(t *testing.T) {
 		t.Fatalf("code %d, body:\n%s", rec.Code, body)
 	}
 
+	// gate action: detail page carries the token; a post without it is refused
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "http://127.0.0.1:4747/t/promo", nil))
+	page := rec.Body.String()
+	i := strings.Index(page, `name="token" value="`)
+	if rec.Code != 200 || i < 0 {
+		t.Fatalf("detail code %d, body:\n%s", rec.Code, page)
+	}
+	token := page[i+20 : i+52]
+	post := func(form string) int {
+		req := httptest.NewRequest("POST", "http://127.0.0.1:4747/t/promo/approve", strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	if post("token=wrong") != 403 {
+		t.Fatal("post without valid token accepted")
+	}
+	if post("token="+token) != 303 {
+		t.Fatal("approve failed")
+	}
+	if tr, _ := w.LoadTrack("promo"); tr.Status != core.StageBuild {
+		t.Fatalf("stage = %s after approve", tr.Status)
+	}
+
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "http://evil.example:4747/", nil))
 	if rec.Code != 403 {
