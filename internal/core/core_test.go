@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -77,7 +78,7 @@ func TestLifecycle(t *testing.T) {
 	}
 	os.Remove(filepath.Join(wt, ".setup-ran"))
 	agents, _ := os.ReadFile(filepath.Join(ws, "tracks/feat/AGENTS.md"))
-	for _, want := range []string{"me/feat", "run `make test`", "Two gates", "knowledge/skills/prd.md"} {
+	for _, want := range []string{"me/feat", "run `make test`", "Two gates", filepath.Join("knowledge", "skills", "prd.md")} {
 		if !strings.Contains(string(agents), want) {
 			t.Errorf("AGENTS.md missing %q:\n%s", want, agents)
 		}
@@ -90,10 +91,14 @@ func TestLifecycle(t *testing.T) {
 	}
 
 	// guard blocks repos/, allows tracks/
-	if w.Guard(strings.NewReader(`{"tool_input":{"file_path":"`+filepath.Join(ws, "repos/app/a.txt")+`"}}`)) == nil {
+	edit := func(path string) error { // json.Marshal escapes Windows backslashes
+		b, _ := json.Marshal(map[string]any{"tool_input": map[string]string{"file_path": path}})
+		return w.Guard(bytes.NewReader(b))
+	}
+	if edit(filepath.Join(ws, "repos", "app", "a.txt")) == nil {
 		t.Error("guard allowed edit in repos/")
 	}
-	if err := w.Guard(strings.NewReader(`{"tool_input":{"file_path":"` + filepath.Join(wt, "a.txt") + `"}}`)); err != nil {
+	if err := edit(filepath.Join(wt, "a.txt")); err != nil {
 		t.Error(err)
 	}
 
