@@ -40,6 +40,19 @@ siding pr add-promo                        # after Gate 2: commit, push, one PR 
 siding done add-promo                      # after log.md is written
 ```
 
+## A task, start to finish
+
+1. **Start.** `siding new add-promo backend,web`, then `siding open add-promo`. The agent reads `AGENTS.md` in the track: rules, repos, repo facts, and the skills for its stage.
+2. **PRD.** The agent writes `docs/<date>_add-promo/prd.md`, runs `siding submit add-promo` and stops at Gate 1.
+3. **Gate 1 (you).** Read the PRD on the board or in your editor. `siding approve add-promo` to continue, or `siding approve add-promo --back` and tell the agent what to change.
+4. **Build.** The agent plans, writes tests and code in `tracks/add-promo/<repo>`, leaves the changes uncommitted, runs `siding submit add-promo` and stops at Gate 2.
+5. **Gate 2 (you).** Review the diff on the board or with `siding report add-promo`. Approve, or send it back.
+6. **Ship.** `siding pr add-promo` commits, pushes and opens one PR per repo.
+7. **Retro.** The agent writes `log.md` and lesson proposals to `knowledge/inbox/`. Review them with `siding learn` or on the board's Inbox.
+8. **Clean up.** After the PRs are merged, `siding done add-promo` removes the worktrees. Docs stay.
+
+Several tracks can run at once, each in its own terminal, on its own ports. If something looks wrong, run `siding doctor`.
+
 Production hotfix from a tag, alongside other tracks on the same repo:
 
 ```
