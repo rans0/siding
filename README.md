@@ -177,6 +177,8 @@ Required skills are fetched at their pinned ref by `siding adapter install`. `si
 go test ./...
 ```
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for layout, cross-platform testing, adapters and releases.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Bundles [xterm.js](https://xtermjs.org) (MIT, `web/xterm/LICENSE`).
