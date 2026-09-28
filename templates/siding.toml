@@ -11,7 +11,7 @@ retro_max = 5                  # max lesson proposals per task
 
 [required.tools]
 # check verifies the Bash hook, not just the binary; --auto-patch because siding runs setup non-interactively
-rtk = { check = "rtk init -g --show | grep -q 'Hook: rtk hook'", setup = "rtk init -g --auto-patch" }
+rtk = { check = "rtk init -g --show", expect = "Hook: rtk hook", setup = "rtk init -g --auto-patch" }
 
 [required.skills]
 brainstorm = { source = "github:obra/superpowers", path = "skills/brainstorming", ref = "v6.4.2", stages = ["plan"] }

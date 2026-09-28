@@ -42,7 +42,7 @@ func TestLifecycle(t *testing.T) {
 		t.Fatal("second init should fail")
 	}
 	// no network in tests: drop required skills/tools
-	cfg := "[defaults]\nbase = \"origin/main\"\n[repos.app]\nsetup = \"touch .setup-ran\"\nenv_ports = [\"PORT=3000\"]\n"
+	cfg := "[defaults]\nbase = \"origin/main\"\n[repos.app]\nsetup = \"echo x> .setup-ran\"\nenv_ports = [\"PORT=3000\"]\n"
 	os.WriteFile(filepath.Join(ws, "siding.toml"), []byte(cfg), 0o644)
 	os.WriteFile(filepath.Join(ws, ".siding.local.toml"), []byte("branch_prefix = \"me\"\nadapters = [\"claude\"]\n"), 0o644)
 	os.WriteFile(filepath.Join(ws, "knowledge/repos/app.md"), []byte("run `make test`"), 0o644)

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -36,8 +37,20 @@ type RepoConfig struct {
 }
 
 type Tool struct {
-	Check string `toml:"check"`
-	Setup string `toml:"setup"`
+	Check  string `toml:"check"`
+	Expect string `toml:"expect"` // optional: check passes only if its output contains this
+	Setup  string `toml:"setup"`
+}
+
+// ok runs the tool's check. No check means nothing to verify.
+func (t Tool) ok(dir string) bool {
+	if t.Check == "" {
+		return true
+	}
+	cmd := shell(t.Check)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	return err == nil && strings.Contains(string(out), t.Expect)
 }
 
 type Skill struct {
@@ -220,7 +233,7 @@ func (w *Workspace) Repos() ([]RepoInfo, error) {
 func (w *Workspace) MissingRequired() []string {
 	var missing []string
 	for name, t := range w.Cfg.Required.Tools {
-		if t.Check != "" && sh(w.Root, t.Check) != nil {
+		if !t.ok(w.Root) {
 			missing = append(missing, "tool "+name)
 		}
 	}
@@ -232,10 +245,10 @@ func (w *Workspace) MissingRequired() []string {
 	if slices.Contains(w.Local.Adapters, "claude") {
 		for name, s := range w.Cfg.Required.Skills {
 			if s.ClaudePlugin != "" {
-				if sh(w.Root, "command -v node") != nil {
+				if _, err := exec.LookPath("node"); err != nil {
 					missing = append(missing, "tool node (hooks of skill "+name+")")
 				}
-				if sh(w.Root, "claude plugin list | grep -qF "+s.ClaudePlugin) != nil {
+				if out, err := run(w.Root, "claude", "plugin", "list"); err != nil || !strings.Contains(out, s.ClaudePlugin) {
 					missing = append(missing, "claude plugin "+s.ClaudePlugin)
 				}
 			}
@@ -289,9 +302,16 @@ func git(dir string, args ...string) (string, error) {
 	return s, nil
 }
 
-// ponytail: POSIX sh only; native Windows needs cmd /c here (v1.0).
+// shell runs a user-written command line: sh -c, or cmd /c on Windows.
+func shell(command string) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		return exec.Command("cmd", "/c", command)
+	}
+	return exec.Command("sh", "-c", command)
+}
+
 func sh(dir, command string) error {
-	cmd := exec.Command("sh", "-c", command)
+	cmd := shell(command)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

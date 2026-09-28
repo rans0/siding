@@ -134,7 +134,7 @@ func (w *Workspace) OpenCmd(task, agent string) (*exec.Cmd, error) {
 	session := "track-" + task
 	switch _, err := exec.LookPath("tmux"); {
 	case err != nil:
-		cmd = exec.Command("sh", "-c", agent)
+		cmd = shell(agent)
 	case os.Getenv("TMUX") != "":
 		// Inside tmux: create the session detached if needed, then switch to it.
 		cmd = exec.Command("sh", "-c", `tmux has-session -t "$1" 2>/dev/null || tmux new-session -d -s "$1" -c "$2" "$3"; tmux switch-client -t "$1"`, "sh", session, dir, agent)

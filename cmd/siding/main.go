@@ -28,10 +28,13 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding report <task>                       base, commits and diffstat per repo
   siding pr <task>                           after Gate 2: commit, push, open a PR per repo (needs gh)
   siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
-  siding adapter install <agents|claude>     set up required tools, skills, harness files
+  siding adapter install <harness>           agents|claude|codex|cursor|opencode: tools, skills, harness files
   siding learn                               review knowledge/inbox: accept, edit, skip, delete
   siding doctor                              check tools, skills, config, worktrees, stale facts
+  siding version
 `
+
+var version = "dev" // set by the release build
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -65,6 +68,10 @@ func need(args []string, n int, form string) error {
 func run(args []string) error {
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" || args[0] == "help" {
 		fmt.Print(usage)
+		return nil
+	}
+	if args[0] == "version" || args[0] == "--version" {
+		fmt.Println("siding", version)
 		return nil
 	}
 	cmd, args := args[0], args[1:]

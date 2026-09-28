@@ -65,6 +65,7 @@ func (w *Workspace) Doctor() []Problem {
 		}
 		for _, l := range strings.Split(list, "\n") {
 			dir, ok := strings.CutPrefix(l, "worktree ")
+			dir = filepath.FromSlash(dir) // git prints C:/... on Windows
 			if !ok || !strings.HasPrefix(dir, tracksDir) || want[dir] {
 				continue
 			}

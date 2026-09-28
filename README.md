@@ -119,7 +119,7 @@ setup = "go mod download"      # runs in each new worktree
 env_ports = ["PORT=8080", "DB_PORT=5432"]
 
 [required.tools]
-rtk = { check = "rtk init -g --show | grep -q 'Hook: rtk hook'", setup = "rtk init -g --auto-patch" }
+rtk = { check = "rtk init -g --show", expect = "Hook: rtk hook", setup = "rtk init -g --auto-patch" }
 
 [required.skills]
 brainstorm = { source = "github:obra/superpowers", path = "skills/brainstorming", ref = "v6.4.2", stages = ["plan"] }

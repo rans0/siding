@@ -1,0 +1,31 @@
+version: 2
+project_name: siding
+
+builds:
+  - main: ./cmd/siding
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags: [-s -w -X main.version={{.Version}}]
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+# Needs repos rans0/homebrew-tap and rans0/scoop-bucket, and a TAP_TOKEN secret that can push to them.
+homebrew_casks:
+  - repository: { owner: rans0, name: homebrew-tap, token: "{{ .Env.TAP_TOKEN }}" }
+    homepage: https://github.com/rans0/siding
+    description: One task, one track, across every repo it touches, with any agent.
+    license: MIT
+
+scoops:
+  - repository: { owner: rans0, name: scoop-bucket, token: "{{ .Env.TAP_TOKEN }}" }
+    homepage: https://github.com/rans0/siding
+    description: One task, one track, across every repo it touches, with any agent.
+    license: MIT
