@@ -23,7 +23,7 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding ls                                  all tracks
   siding submit <task>                       agent: move the track to its next gate
   siding approve <task> [--back]             you: pass the gate, or send the track back
-  siding open <task> [--agent cmd]           start the agent in the track (tmux session if available)
+  siding open <task> [--agent cmd]           start the agent in the track, or attach to it
   siding ui [--port N]                       board on 127.0.0.1
   siding report <task>                       base, commits and diffstat per repo
   siding pr <task>                           after Gate 2: commit, push, open a PR per repo (needs gh)
@@ -215,11 +215,7 @@ func run(args []string) error {
 		if err := need(pos, 1, "open <task> [--agent cmd]"); err != nil {
 			return err
 		}
-		c, err := w.OpenCmd(pos[0], *agent)
-		if err != nil {
-			return err
-		}
-		return c.Run()
+		return w.Session(pos[0], *agent)
 
 	case "ui":
 		port := fs.Int("port", 4747, "port on 127.0.0.1")

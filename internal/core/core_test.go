@@ -129,10 +129,6 @@ func TestLifecycle(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(wt, "b.txt")); err != nil {
 		t.Fatal("existing branch not reused")
 	}
-	cmd, err := w.OpenCmd("feat", "true")
-	if err != nil || cmd.Dir != filepath.Join(ws, "tracks/feat") {
-		t.Fatalf("OpenCmd: %v %v", cmd, err)
-	}
 	if s := w.State(&Track{Task: "feat", Repos: []TrackRepo{{Name: "app", Base: "origin/main"}}}); s[0].Ahead != 1 {
 		t.Fatalf("ahead = %d, want 1", s[0].Ahead)
 	}

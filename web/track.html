@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.T.Task}} · siding</title>
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/xterm/xterm.css">
 </head>
 <body>
 <header><h1><a href="/">siding</a> / {{.T.Task}}</h1><span>{{.Stage}}</span></header>
@@ -20,8 +21,30 @@
 
 <section>
   <h2>Terminal</h2>
-  {{if .HasTerminal}}<iframe src="/t/{{.T.Task}}/terminal" title="Agent terminal for {{.T.Task}}"></iframe>
-  {{else}}<p class="empty">No tmux session <code>track-{{.T.Task}}</code>. Start one with <code>siding open {{.T.Task}}</code>.</p>{{end}}
+  {{if .HasTerminal}}<div id="term" class="term" role="application" aria-label="Agent terminal for {{.T.Task}}"></div>
+  <p class="empty" id="term-status">Live. Typing here goes to the agent, same as in the terminal running <code>siding open</code>.</p>
+  <script src="/xterm/xterm.js"></script>
+  <script>
+  (() => {
+    const status = document.getElementById("term-status")
+    const ws = new WebSocket(`ws://${location.host}/t/{{.T.Task}}/pty?token={{.Token}}`)
+    ws.binaryType = "arraybuffer"
+    let term
+    ws.onmessage = (e) => {
+      if (!term) {
+        const [cols, rows] = e.data.split(" ").map(Number)
+        term = new Terminal({ cols, rows, fontSize: 12, scrollback: 5000,
+          theme: matchMedia("(prefers-color-scheme: dark)").matches ? {} : { background: "#ffffff", foreground: "#1d1c1a", cursor: "#1d1c1a" } })
+        term.open(document.getElementById("term"))
+        term.onData((d) => ws.readyState === 1 && ws.send(d))
+        return
+      }
+      term.write(new Uint8Array(e.data))
+    }
+    ws.onclose = () => { status.textContent = "Session ended or disconnected. Reload after running siding open again." }
+  })()
+  </script>
+  {{else}}<p class="empty">No running session. Start one with <code>siding open {{.T.Task}}</code> in any terminal; it shows up here live.</p>{{end}}
 </section>
 
 <section>

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -111,38 +110,4 @@ func keys(pairs []string) []string {
 		out[i], _, _ = strings.Cut(p, "=")
 	}
 	return out
-}
-
-// OpenCmd returns the command that starts the agent for a track: in a tmux session
-// named track-<task> when tmux exists (reattaching if it is already running),
-// otherwise the agent itself in the track folder.
-func (w *Workspace) OpenCmd(task, agent string) (*exec.Cmd, error) {
-	t, err := w.LoadTrack(task)
-	if err != nil {
-		return nil, err
-	}
-	if agent == "" {
-		agent = w.Local.Agent
-	}
-	if agent == "" {
-		agent = "claude"
-	}
-	dir := w.trackDir(task)
-	// Ports reach services through each worktree's .env; the session only needs to know its track.
-	env := append(os.Environ(), "SIDING_TRACK="+task, "SIDING_SLOT="+strconv.Itoa(t.Slot))
-	var cmd *exec.Cmd
-	session := "track-" + task
-	switch _, err := exec.LookPath("tmux"); {
-	case err != nil:
-		cmd = shell(agent)
-	case os.Getenv("TMUX") != "":
-		// Inside tmux: create the session detached if needed, then switch to it.
-		cmd = exec.Command("sh", "-c", `tmux has-session -t "$1" 2>/dev/null || tmux new-session -d -s "$1" -c "$2" "$3"; tmux switch-client -t "$1"`, "sh", session, dir, agent)
-	default:
-		cmd = exec.Command("tmux", "new-session", "-A", "-s", session, "-c", dir,
-			"-e", "SIDING_TRACK="+task, "-e", "SIDING_SLOT="+strconv.Itoa(t.Slot), agent)
-	}
-	cmd.Dir, cmd.Env = dir, env
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
-	return cmd, nil
 }

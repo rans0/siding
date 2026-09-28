@@ -158,16 +158,3 @@ func run(dir, name string, args ...string) (string, error) {
 	}
 	return s, nil
 }
-
-// Terminal returns a snapshot of the track's tmux session, or "" when there is none.
-// ponytail: polled snapshot, not an interactive xterm.js stream; add a PTY websocket when typing from the board is needed.
-func (w *Workspace) Terminal(task string) string {
-	if _, err := exec.LookPath("tmux"); err != nil {
-		return ""
-	}
-	out, err := run(w.Root, "tmux", "capture-pane", "-p", "-J", "-t", "track-"+task)
-	if err != nil {
-		return ""
-	}
-	return out
-}

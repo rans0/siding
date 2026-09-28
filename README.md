@@ -15,10 +15,12 @@ The name comes from a railway siding: a side track where a train works without b
 
 ## Install
 
-Requires Go 1.25+ and git. Linux and macOS.
+Requires git. Linux, macOS and Windows.
 
 ```
-go install github.com/rans0/siding/cmd/siding@latest
+brew install rans0/tap/siding                 # macOS, Linux
+scoop bucket add rans0 https://github.com/rans0/scoop-bucket && scoop install siding   # Windows
+go install github.com/rans0/siding/cmd/siding@latest                               # Go 1.25+
 ```
 
 ## Quick start
@@ -27,10 +29,10 @@ go install github.com/rans0/siding/cmd/siding@latest
 siding init ~/work && cd ~/work
 siding repo add git@github.com:acme/backend.git
 siding repo add git@github.com:acme/web.git
-siding adapter install claude              # or: agents (instruction-only)
+siding adapter install claude              # or: codex, cursor, opencode, agents
 
 siding new add-promo backend,web           # tracks/add-promo/{backend,web}
-siding open add-promo                      # agent in a tmux session (or foreground without tmux)
+siding open add-promo                      # agent in this terminal, also live on the board
 siding ui                                  # board at http://127.0.0.1:4747
 siding ls                                  # agent submits at each gate
 siding approve add-promo                   # you pass Gate 1, later Gate 2
@@ -55,14 +57,15 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding ls` | All tracks with stage, uncommitted files and ahead/behind counts |
 | `siding submit <task>` | Agent: move the track to its next gate (Gate 1 needs `prd.md`) |
 | `siding approve <task> [--back]` | You: pass the gate, or send the track back a stage |
-| `siding open <task> [--agent cmd]` | Start the agent in the track, in tmux session `track-<task>` when tmux is installed |
+| `siding open <task> [--agent cmd]` | Start the agent in the track in any terminal; if it is already running, attach to it |
 | `siding report <task>` | Base, commits since base and diffstat per repo |
 | `siding pr <task>` | After Gate 2: commit, push and open a PR per repo with `gh`; title and body from `prd.md` |
-| `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track diff, docs, terminal snapshot, gate buttons, Inbox and Health |
+| `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track diff, docs, live terminal, gate buttons, Inbox and Health |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
-| `siding adapter install <agents\|claude>` | Set up required tools and skills, write harness files into tracks |
+| `siding adapter install <agents\|claude\|codex\|cursor\|opencode>` | Set up required tools and skills, write harness files into tracks |
 | `siding learn` | Review `knowledge/inbox/` one proposal at a time: accept, edit, skip or delete |
 | `siding doctor` | Check required tools, skills and plugins, config, missing or orphaned worktrees, stale facts |
+| `siding version` | Print the version |
 
 Safety behaviors:
 
@@ -71,9 +74,11 @@ Safety behaviors:
 - `new` reports failures per repo and keeps the repos that succeeded.
 - `done` checks everything before removing anything, and refuses while `log.md` is missing or any repo has uncommitted changes or unpushed commits, unless `--force` is given.
 
-Stages: `prd` → `GATE 1` → `build` → `GATE 2` → `ship`. The agent runs `siding submit` at each gate and stops; you run `siding approve`. In Claude Code a hook blocks the agent from running `siding approve` itself, and ponytail is enabled only in the build and review stages (applies from the next session).
+Stages: `prd` → `GATE 1` → `build` → `GATE 2` → `ship`. The agent runs `siding submit` at each gate and stops; you run `siding approve`. In Claude Code, Codex, Cursor and OpenCode a hook blocks the agent from running `siding approve` itself, and ponytail is enabled only in the build and review stages (applies from the next session).
 
-The board keeps no state of its own and binds to `127.0.0.1` only. Gate buttons call the same code as `siding approve`, protected by a per-server token. The terminal view is a snapshot of the `track-<task>` tmux session refreshed every 2 seconds, not an interactive terminal.
+The board keeps no state of its own and binds to `127.0.0.1` only. Gate buttons call the same code as `siding approve`, protected by a per-server token. The track page shows the agent's terminal live (xterm.js) and you can type into it; the connection is refused from other origins and without the token.
+
+`siding open` runs the agent in a pseudo-terminal owned by siding, so it works in any terminal app (Terminal, iTerm2, a VS Code panel) with no tmux. Run `siding open` again from another terminal to attach to the same session. The session ends when the agent exits or the terminal that started it closes. On Windows the agent runs directly in the terminal and the board shows no terminal.
 
 ## Learning loop
 
@@ -143,11 +148,15 @@ Required skills are fetched at their pinned ref by `siding adapter install`. `si
 | Harness | Support |
 | --- | --- |
 | Claude Code | `CLAUDE.md`, `/siding` slash command, hook blocking edits in `repos/`, ponytail plugin enabled inside tracks only |
+| Codex | `.agents/skills/siding` skill, `.codex/hooks.json` guard (edits in `repos/`, `siding approve`) |
+| Cursor | `/siding` command, `.agents/skills/siding` skill, `.cursor/hooks.json` guard |
+| OpenCode | `/siding` command, `.opencode/plugins/siding-guard.js` guard |
 | Any other agent | Instruction-only through `AGENTS.md` (`siding adapter install agents`) |
 
 ## Roadmap
 
-- **v1.0:** tested Codex, Cursor and OpenCode adapters, native Windows, brew and scoop
+- Sessions that outlive the terminal that started them
+- Live board terminal on Windows (ConPTY)
 
 ## Development
 
@@ -157,4 +166,4 @@ go test ./...
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). Bundles [xterm.js](https://xtermjs.org) (MIT, `web/xterm/LICENSE`).

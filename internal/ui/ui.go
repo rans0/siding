@@ -3,6 +3,7 @@
 package ui
 
 import (
+	"bufio"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -10,12 +11,14 @@ import (
 	"html/template"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/rans0/siding"
 	"github.com/rans0/siding/internal/core"
+	"golang.org/x/net/websocket"
 )
 
 var pages = template.Must(template.ParseFS(siding.Assets, "web/*.html"))
@@ -106,12 +109,27 @@ func Handler(w *core.Workspace) http.Handler {
 		}
 		render(rw, "track.html", map[string]any{
 			"T": t, "Stage": core.StageLabel[t.Status], "AtGate": atGate(t), "Token": token,
-			"Reports": reports, "Docs": docs, "HasTerminal": w.Terminal(t.Task) != "",
+			"Reports": reports, "Docs": docs, "HasTerminal": w.SessionRunning(t.Task),
 			"Error": r.URL.Query().Get("error"),
 		})
 	})
-	mux.HandleFunc("GET /t/{task}/terminal", func(rw http.ResponseWriter, r *http.Request) {
-		render(rw, "terminal.html", w.Terminal(r.PathValue("task")))
+	mux.HandleFunc("GET /xterm/", func(rw http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(rw, r, siding.Assets, "web"+r.URL.Path)
+	})
+	mux.HandleFunc("GET /t/{task}/pty", func(rw http.ResponseWriter, r *http.Request) {
+		// Browsers always send Origin on websockets and cannot forge it, so a foreign
+		// page cannot type into the agent; the token covers non-browser clients too.
+		if u, err := url.Parse(r.Header.Get("Origin")); err != nil || u.Host != r.Host ||
+			subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("token")), []byte(token)) != 1 {
+			http.Error(rw, "forbidden", http.StatusForbidden)
+			return
+		}
+		c, err := w.Attach(r.PathValue("task"))
+		if err != nil {
+			http.Error(rw, "no running session", http.StatusNotFound)
+			return
+		}
+		websocket.Server{Handler: func(ws *websocket.Conn) { bridge(ws, c) }}.ServeHTTP(rw, r)
 	})
 	mux.HandleFunc("GET /inbox", func(rw http.ResponseWriter, r *http.Request) {
 		props, err := w.Inbox()
@@ -164,6 +182,39 @@ func Handler(w *core.Workspace) http.Handler {
 		http.Redirect(rw, r, dest, http.StatusSeeOther)
 	})
 	return localOnly(mux)
+}
+
+// bridge copies between the browser terminal and the agent's session. The first text
+// frame carries the session's "cols rows"; output goes as binary frames, input comes as text.
+func bridge(ws *websocket.Conn, c net.Conn) {
+	defer c.Close()
+	defer ws.Close()
+	r := bufio.NewReader(c)
+	size, err := r.ReadString('\n')
+	if err != nil {
+		return
+	}
+	websocket.Message.Send(ws, strings.TrimSpace(size))
+	go func() {
+		defer c.Close()
+		for {
+			var in string
+			if websocket.Message.Receive(ws, &in) != nil {
+				return
+			}
+			c.Write([]byte(in))
+		}
+	}()
+	b := make([]byte, 32<<10)
+	for {
+		n, err := r.Read(b)
+		if n > 0 && websocket.Message.Send(ws, b[:n]) != nil {
+			return
+		}
+		if err != nil {
+			return
+		}
+	}
 }
 
 func validToken(rw http.ResponseWriter, r *http.Request, token string) bool {
