@@ -60,3 +60,34 @@ func TestBoard(t *testing.T) {
 		t.Fatalf("foreign Host got %d, want 403", rec.Code)
 	}
 }
+
+func TestInboxAndHealth(t *testing.T) {
+	ws := t.TempDir()
+	os.WriteFile(filepath.Join(ws, "siding.toml"), nil, 0o644)
+	os.MkdirAll(filepath.Join(ws, "knowledge/inbox"), 0o755)
+	os.MkdirAll(filepath.Join(ws, "knowledge/repos"), 0o755)
+	os.WriteFile(filepath.Join(ws, "knowledge/inbox/1.md"), []byte("---\nrepo: web\ntrack: promo\ncommit: abc\n---\nOld\n"), 0o644)
+	w, _ := core.Open(ws)
+	h := Handler(w)
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "http://127.0.0.1/inbox", nil))
+	page := rec.Body.String()
+	i := strings.Index(page, `name="token" value="`)
+	if rec.Code != 200 || i < 0 || !strings.Contains(page, "Old") {
+		t.Fatalf("inbox code %d:\n%s", rec.Code, page)
+	}
+	req := httptest.NewRequest("POST", "http://127.0.0.1/inbox/1.md/accept", strings.NewReader("token="+page[i+20:i+52]+"&body=Edited"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if b, _ := os.ReadFile(filepath.Join(ws, "knowledge/repos/web.md")); rec.Code != 303 || !strings.Contains(string(b), "- Edited <!-- verified abc promo") {
+		t.Fatalf("accept code %d, web.md:\n%s", rec.Code, b)
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "http://127.0.0.1/health", nil))
+	if rec.Code != 200 {
+		t.Fatalf("health code %d", rec.Code)
+	}
+}

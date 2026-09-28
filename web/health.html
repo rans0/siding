@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Health · siding</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header><h1><a href="/">siding</a> / Health</h1><span>same checks as <code>siding doctor</code></span></header>
+<div class="detail">
+{{range .}}
+<p><strong class="err">{{.Kind}}</strong> {{.Detail}}</p>
+{{else}}<p class="ok">All checks pass.</p>{{end}}
+</div>
+</body>
+</html>

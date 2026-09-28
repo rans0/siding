@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"net/http"
@@ -23,12 +24,13 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding submit <task>                       agent: move the track to its next gate
   siding approve <task> [--back]             you: pass the gate, or send the track back
   siding open <task> [--agent cmd]           start the agent in the track (tmux session if available)
-  siding ui [--port N]                       read-only board on 127.0.0.1
+  siding ui [--port N]                       board on 127.0.0.1
   siding report <task>                       base, commits and diffstat per repo
   siding pr <task>                           after Gate 2: commit, push, open a PR per repo (needs gh)
   siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
   siding adapter install <agents|claude>     set up required tools, skills, harness files
-  siding doctor                              check required tools and skills
+  siding learn                               review knowledge/inbox: accept, edit, skip, delete
+  siding doctor                              check tools, skills, config, worktrees, stale facts
 `
 
 func main() {
@@ -301,13 +303,16 @@ func run(args []string) error {
 		fmt.Println("adapter installed:", pos[1])
 		return nil
 
+	case "learn":
+		return learn(w)
+
 	case "doctor":
-		missing := w.MissingRequired()
-		for _, m := range missing {
-			fmt.Println("missing:", m)
+		problems := w.Doctor()
+		for _, p := range problems {
+			fmt.Printf("%s: %s\n", p.Kind, p.Detail)
 		}
-		if len(missing) > 0 {
-			return fmt.Errorf("%d problem(s); run `siding adapter install <harness>`", len(missing))
+		if len(problems) > 0 {
+			return fmt.Errorf("%d problem(s)", len(problems))
 		}
 		fmt.Println("ok")
 		return nil
@@ -320,4 +325,51 @@ func run(args []string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown command %q\n\n%s", cmd, usage)
+}
+
+// learn walks the inbox one proposal at a time.
+func learn(w *core.Workspace) error {
+	props, err := w.Inbox()
+	if err != nil {
+		return err
+	}
+	if len(props) == 0 {
+		fmt.Println("inbox empty")
+		return nil
+	}
+	in := bufio.NewReader(os.Stdin)
+	for i, p := range props {
+		fmt.Printf("[%d/%d] %s: %s\n      source: %s, commit %s\n", i+1, len(props), p.Repo, p.Body, p.Track, p.Commit)
+		for {
+			fmt.Print("      (a)ccept  (e)dit  (s)kip  (d)elete > ")
+			line, err := in.ReadString('\n')
+			if err != nil && line == "" {
+				return nil // EOF: stop, remaining proposals stay in the inbox
+			}
+			var dest string
+			switch strings.TrimSpace(line) {
+			case "a":
+				dest, err = w.Accept(p.File, "")
+			case "e":
+				fmt.Print("      new text > ")
+				text, _ := in.ReadString('\n')
+				if strings.TrimSpace(text) == "" {
+					continue
+				}
+				dest, err = w.Accept(p.File, text)
+			case "s":
+			case "d":
+				err = w.Reject(p.File)
+			default:
+				continue
+			}
+			if err != nil {
+				fmt.Println("      error:", err)
+			} else if dest != "" {
+				fmt.Println("      ->", dest)
+			}
+			break
+		}
+	}
+	return nil
 }

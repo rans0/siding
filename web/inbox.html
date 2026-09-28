@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbox · siding</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header><h1><a href="/">siding</a> / Inbox</h1><span>{{len .Props}} proposal(s)</span></header>
+<div class="detail">
+{{with .Error}}<p class="err" role="alert">{{.}}</p>{{end}}
+{{with .Done}}<p class="ok" role="status">{{.}}</p>{{end}}
+{{range .Props}}
+<article class="card">
+  <div class="task">{{.Repo}}</div>
+  <div class="stage">{{.File}} · {{.Track}} · {{.Date}} · commit <code>{{.Commit}}</code></div>
+  <form method="post" action="/inbox/{{.File}}/accept">
+    <input type="hidden" name="token" value="{{$.Token}}">
+    <label for="b-{{.File}}" class="empty">Edit before accepting if needed</label>
+    <textarea id="b-{{.File}}" name="body">{{.Body}}</textarea>
+    <div class="actions"><button class="primary">Accept</button>
+      <button formaction="/inbox/{{.File}}/delete">Delete</button></div>
+  </form>
+</article>
+{{else}}<p class="empty">Inbox empty. Retros write proposals to <code>knowledge/inbox/</code>.</p>{{end}}
+</div>
+</body>
+</html>

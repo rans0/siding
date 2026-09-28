@@ -58,10 +58,11 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding open <task> [--agent cmd]` | Start the agent in the track, in tmux session `track-<task>` when tmux is installed |
 | `siding report <task>` | Base, commits since base and diffstat per repo |
 | `siding pr <task>` | After Gate 2: commit, push and open a PR per repo with `gh`; title and body from `prd.md` |
-| `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track diff, docs, terminal snapshot, gate buttons |
+| `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track diff, docs, terminal snapshot, gate buttons, Inbox and Health |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
 | `siding adapter install <agents\|claude>` | Set up required tools and skills, write harness files into tracks |
-| `siding doctor` | Check required tools, skills and plugins |
+| `siding learn` | Review `knowledge/inbox/` one proposal at a time: accept, edit, skip or delete |
+| `siding doctor` | Check required tools, skills and plugins, config, missing or orphaned worktrees, stale facts |
 
 Safety behaviors:
 
@@ -73,6 +74,18 @@ Safety behaviors:
 Stages: `prd` → `GATE 1` → `build` → `GATE 2` → `ship`. The agent runs `siding submit` at each gate and stops; you run `siding approve`. In Claude Code a hook blocks the agent from running `siding approve` itself, and ponytail is enabled only in the build and review stages (applies from the next session).
 
 The board keeps no state of its own and binds to `127.0.0.1` only. Gate buttons call the same code as `siding approve`, protected by a per-server token. The terminal view is a snapshot of the `track-<task>` tmux session refreshed every 2 seconds, not an interactive terminal.
+
+## Learning loop
+
+Before `done`, the agent's retro writes up to `retro_max` lesson proposals to `knowledge/inbox/`, one Markdown file each with `repo`, `track`, `date` and `commit` frontmatter. `siding learn` (or the board's Inbox) walks them:
+
+```
+[1/2] backend: integration tests need `scripts/db-up.sh` first
+      source: add-promo, commit a1b2c3d
+      (a)ccept  (e)dit  (s)kip  (d)elete >
+```
+
+Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified <commit> <track> <date> -->` marker, and every later track touching that repo gets them in its `AGENTS.md`. A proposal with `repo: skill:<name>` becomes `knowledge/skills/<name>.md`. `siding doctor` flags a fact as stale when a backticked path in it (containing `/`) no longer exists in the repo's main clone.
 
 ## Workspace layout
 
@@ -134,7 +147,6 @@ Required skills are fetched at their pinned ref by `siding adapter install`. `si
 
 ## Roadmap
 
-- **v0.4:** `learn`, full `doctor`, stale-fact markers
 - **v1.0:** tested Codex, Cursor and OpenCode adapters, native Windows, brew and scoop
 
 ## Development

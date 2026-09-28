@@ -113,9 +113,43 @@ func Handler(w *core.Workspace) http.Handler {
 	mux.HandleFunc("GET /t/{task}/terminal", func(rw http.ResponseWriter, r *http.Request) {
 		render(rw, "terminal.html", w.Terminal(r.PathValue("task")))
 	})
+	mux.HandleFunc("GET /inbox", func(rw http.ResponseWriter, r *http.Request) {
+		props, err := w.Inbox()
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		render(rw, "inbox.html", map[string]any{"Props": props, "Token": token,
+			"Error": r.URL.Query().Get("error"), "Done": r.URL.Query().Get("done")})
+	})
+	mux.HandleFunc("POST /inbox/{file}/{action}", func(rw http.ResponseWriter, r *http.Request) {
+		if !validToken(rw, r, token) {
+			return
+		}
+		file, dest, err := r.PathValue("file"), "", error(nil)
+		switch r.PathValue("action") {
+		case "accept":
+			dest, err = w.Accept(file, r.PostFormValue("body"))
+		case "delete":
+			err = w.Reject(file)
+		default:
+			http.NotFound(rw, r)
+			return
+		}
+		q := "?done=" + template.URLQueryEscaper(file+" -> "+dest)
+		if dest == "" {
+			q = "?done=" + template.URLQueryEscaper(file+" deleted")
+		}
+		if err != nil {
+			q = "?error=" + template.URLQueryEscaper(err.Error())
+		}
+		http.Redirect(rw, r, "/inbox"+q, http.StatusSeeOther)
+	})
+	mux.HandleFunc("GET /health", func(rw http.ResponseWriter, r *http.Request) {
+		render(rw, "health.html", w.Doctor())
+	})
 	mux.HandleFunc("POST /t/{task}/{action}", func(rw http.ResponseWriter, r *http.Request) {
-		if subtle.ConstantTimeCompare([]byte(r.PostFormValue("token")), []byte(token)) != 1 {
-			http.Error(rw, "stale page, reload and try again", http.StatusForbidden)
+		if !validToken(rw, r, token) {
 			return
 		}
 		task, action := r.PathValue("task"), r.PathValue("action")
@@ -130,6 +164,14 @@ func Handler(w *core.Workspace) http.Handler {
 		http.Redirect(rw, r, dest, http.StatusSeeOther)
 	})
 	return localOnly(mux)
+}
+
+func validToken(rw http.ResponseWriter, r *http.Request, token string) bool {
+	if subtle.ConstantTimeCompare([]byte(r.PostFormValue("token")), []byte(token)) != 1 {
+		http.Error(rw, "stale page, reload and try again", http.StatusForbidden)
+		return false
+	}
+	return true
 }
 
 func atGate(t *core.Track) bool { return t.Status == core.StageGate1 || t.Status == core.StageGate2 }
