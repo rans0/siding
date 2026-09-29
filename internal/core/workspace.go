@@ -126,16 +126,10 @@ func Init(dir string) error {
 	if err != nil {
 		return err
 	}
+	// No git init: versioning the workspace is the user's choice; .gitignore is ready for it.
 	_, err = gi.WriteString(localFile + "\nrepos/\ntracks/\n.siding/\n")
 	gi.Close()
-	if err != nil {
-		return err
-	}
-	if _, err := os.Stat(filepath.Join(dir, ".git")); errors.Is(err, fs.ErrNotExist) {
-		_, err = git(dir, "init", "-q")
-		return err
-	}
-	return nil
+	return err
 }
 
 // Open finds the workspace containing dir by walking up to siding.toml.

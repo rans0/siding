@@ -127,7 +127,7 @@ Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified
 
 ```
 ~/work/
-├── siding.toml            # workspace config (commit this)
+├── siding.toml            # workspace config; `git init` the workspace to version it with knowledge/
 ├── .siding.local.toml     # per machine: branch prefix, ref-only repos, adapters (gitignored)
 ├── repos/                 # main clones, never edited
 ├── tracks/<task>/         # AGENTS.md, .track.json, one worktree per repo
