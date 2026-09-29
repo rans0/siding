@@ -55,6 +55,20 @@ Later, to deep-review a finished task: `siding review add-promo` creates track `
 
 Several tracks can run at once, each in its own terminal, on its own ports. If something looks wrong, run `siding doctor`.
 
+### Adopting an existing workspace
+
+Already have clones side by side and a `docs/` folder with work in progress? Start a fresh workspace and point it at the old one. The old workspace is only read, never changed.
+
+```
+siding init ~/work && cd ~/work
+siding adopt ~/code/old-ws                   # copies every clone into repos/, with local branches and unpushed commits
+siding new add-promo backend,web \
+  --branch backend=feature/promo,web=wip/promo-ui \
+  --docs ~/code/old-ws/docs/PROMO            # copied into docs/<date>_add-promo/ as is
+```
+
+`adopt` prints the branch each clone was on, and warns about uncommitted changes, which are not copied: commit them in the old clone first. Each copy's `origin` points at the real remote. A track with `--branch` or `--docs` starts at `prd` with the adopt skill: the agent reads the old docs and the commits already on the branches, writes `prd.md` for the remaining work, and stops at Gate 1. Copy finished docs anywhere under `docs/` (for example `docs/archive/`); siding ignores folders not named `<date>_<task>`.
+
 Production hotfix from a tag, alongside other tracks on the same repo:
 
 ```
@@ -66,9 +80,10 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | Command | What it does |
 | --- | --- |
 | `siding init [dir]` | Create a workspace |
-| `siding repo add <url> [--ref-only]` | Clone into `repos/`; `--ref-only` repos can't be used in tracks |
+| `siding repo add <url\|dir> [--ref-only]` | Clone into `repos/` (a local clone is copied with its branches); `--ref-only` repos can't be used in tracks |
+| `siding adopt <old-workspace>` | Copy every clone in an old workspace into `repos/`; the old one is untouched |
 | `siding repo ls` | Repos and the tracks using each |
-| `siding new <task> <repo,repo> [--from ref\|a=x,b=y] [--hotfix]` | Create a track: worktrees, setup commands, `AGENTS.md` |
+| `siding new <task> <repo,repo> [--from ref\|a=x,b=y] [--hotfix] [--branch b\|a=x,b=y] [--docs dir]` | Create a track: worktrees, setup commands, `AGENTS.md`; `--branch`/`--docs` adopt existing work |
 | `siding ls` | All tracks with stage, uncommitted files and ahead/behind counts |
 | `siding submit <task>` | Agent: move the track to its next gate (Gate 1 needs `prd.md`) |
 | `siding approve <task> [--back]` | You: pass the gate, or send the track back a stage |
@@ -120,7 +135,7 @@ Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified
 ├── templates/             # starting points for those four docs
 ├── knowledge/
 │   ├── rules/             # always loaded into AGENTS.md
-│   ├── skills/            # loaded per stage: prd, workflow, tdd, review, hotfix, cross-repo, retro, deep-review
+│   ├── skills/            # loaded per stage: prd, workflow, tdd, review, hotfix, cross-repo, retro, deep-review, adopt
 │   ├── repos/<repo>.md    # per-repo facts, included in AGENTS.md
 │   └── inbox/             # lesson proposals from retros
 └── .siding/vendor/        # pinned upstream skills

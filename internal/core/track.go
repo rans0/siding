@@ -26,6 +26,7 @@ type Track struct {
 	Slot    int         `json:"slot"` // port slot: every configured port + Slot*port_stride
 	Repos   []TrackRepo `json:"repos"`
 	Review  *Track      `json:"review,omitempty"` // the finished task this track reviews
+	Adopt   bool        `json:"adopt,omitempty"`  // work started before siding: docs and branches brought in
 }
 
 type TrackRepo struct {
@@ -41,6 +42,8 @@ type NewOpts struct {
 	From   string // "ref" for all repos, or "a=x,b=y" per repo
 	Hotfix bool
 	Review *Track
+	Branch string // "name" for all repos, or "a=x,b=y": existing branches to adopt, no prefix
+	Docs   string // existing docs folder copied into the task docs; marks the track adopted
 }
 
 func (w *Workspace) trackDir(task string) string { return w.path("tracks", task) }
@@ -135,6 +138,15 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 	if err != nil {
 		return nil, err
 	}
+	branches, err := parseFrom(o.Branch, o.Repos)
+	if err != nil {
+		return nil, err
+	}
+	if o.Docs != "" {
+		if fi, err := os.Stat(o.Docs); err != nil || !fi.IsDir() {
+			return nil, fmt.Errorf("--docs %q is not a folder", o.Docs)
+		}
+	}
 	if o.Hotfix && o.From == "" {
 		return nil, errors.New("--hotfix needs --from <production tag or ref>")
 	}
@@ -146,6 +158,7 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 		Docs:    filepath.Join("docs", time.Now().Format("2006-01-02")+"_"+task),
 		Status:  StagePRD,
 		Review:  o.Review,
+		Adopt:   o.Docs != "" || o.Branch != "",
 	}
 	if t.Slot, err = w.freeSlot(); err != nil {
 		return nil, err
@@ -158,7 +171,7 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 	}
 	var errs []error
 	for _, r := range o.Repos {
-		tr, err := w.addWorktree(task, r, from[r], o.Hotfix, t.Slot)
+		tr, err := w.addWorktree(task, r, from[r], branches[r], o.Hotfix, t.Slot)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", r, err))
 			continue
@@ -169,6 +182,11 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 		os.RemoveAll(w.trackDir(task))
 		return nil, errors.Join(errs...)
 	}
+	if o.Docs != "" { // copied, not moved: the old workspace stays as it was
+		if err := os.CopyFS(w.path(t.Docs), os.DirFS(o.Docs)); err != nil {
+			errs = append(errs, fmt.Errorf("docs not copied: %w", err))
+		}
+	}
 	if err := w.saveTrack(t); err != nil {
 		return t, err
 	}
@@ -178,7 +196,7 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 	return t, errors.Join(errs...)
 }
 
-func (w *Workspace) addWorktree(task, repo, from string, hotfix bool, slot int) (*TrackRepo, error) {
+func (w *Workspace) addWorktree(task, repo, from, branch string, hotfix bool, slot int) (*TrackRepo, error) {
 	main := w.path("repos", repo)
 	base := from
 	if base == "" {
@@ -187,7 +205,9 @@ func (w *Workspace) addWorktree(task, repo, from string, hotfix bool, slot int) 
 	if base == "" {
 		base = w.Cfg.Defaults.Base
 	}
-	branch := w.branchFor(task, hotfix)
+	if branch == "" {
+		branch = w.branchFor(task, hotfix)
+	}
 	// Best effort: an offline fetch must not block local work.
 	git(main, "fetch", "-q", "--tags", "origin")
 
@@ -346,12 +366,12 @@ func (w *Workspace) WriteAgentFiles(t *Track) error {
 	data := struct {
 		Task, Root, Docs, Stage string
 		Review                  *Track
-		Hotfix                  bool
+		Hotfix, Adopt           bool
 		RetroMax                int
 		Repos                   []repoView
 		Rules                   []string
 		Skills                  []skillRef
-	}{Task: t.Task, Stage: StageLabel[t.Status], Root: w.Root, Docs: w.path(t.Docs), Hotfix: t.Hotfix, Review: t.Review, RetroMax: w.Cfg.Defaults.RetroMax}
+	}{Task: t.Task, Stage: StageLabel[t.Status], Root: w.Root, Docs: w.path(t.Docs), Hotfix: t.Hotfix, Adopt: t.Adopt, Review: t.Review, RetroMax: w.Cfg.Defaults.RetroMax}
 
 	for _, r := range t.Repos {
 		notes, _ := os.ReadFile(w.path("knowledge", "repos", r.Name+".md"))
@@ -407,6 +427,9 @@ func (w *Workspace) skillsFor(t *Track) []skillRef {
 	required("plan")
 	if t.Review != nil {
 		add("plan", "deep-review", k("deep-review"))
+	}
+	if t.Adopt {
+		add("plan", "adopt", k("adopt"))
 	}
 	add("plan", "prd", k("prd"))
 	add("build", "workflow", k("workflow"))

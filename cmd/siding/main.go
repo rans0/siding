@@ -17,9 +17,11 @@ import (
 const usage = `siding: multi-repo, multi-task workspace manager for coding agents
 
   siding init [dir]                          create a workspace
-  siding repo add <url> [--ref-only]         clone into repos/
+  siding repo add <url|dir> [--ref-only]     clone into repos/ (a local clone is copied with its branches)
+  siding adopt <old-workspace>               copy every clone in an old workspace into repos/
   siding repo ls                             repos and the tracks using them
-  siding new <task> <repos> [--from ref|a=x,b=y] [--hotfix]
+  siding new <task> <repos> [--from ref|a=x,b=y] [--hotfix] [--branch name|a=x,b=y] [--docs dir]
+                                             --branch/--docs adopt work started before siding
   siding ls                                  all tracks
   siding submit <task>                       agent: move the track to its next gate
   siding approve <task> [--back]             you: pass the gate, or send the track back
@@ -111,9 +113,9 @@ func run(args []string) error {
 		}
 		switch {
 		case len(pos) == 2 && pos[0] == "add":
-			name, err := w.RepoAdd(pos[1], *refOnly)
+			name, note, err := w.RepoAdd(pos[1], *refOnly)
 			if err == nil {
-				fmt.Println("added repos/" + name)
+				fmt.Println("added repos/"+name, note)
 			}
 			return err
 		case len(pos) == 1 && pos[0] == "ls":
@@ -134,17 +136,36 @@ func run(args []string) error {
 		}
 		return fmt.Errorf("usage: siding repo add <url> [--ref-only] | siding repo ls")
 
-	case "new":
-		from := fs.String("from", "", "base ref for all repos, or repo=ref,repo=ref")
-		hotfix := fs.Bool("hotfix", false, "hotfix track (needs --from)")
+	case "adopt":
 		pos, err := parse(fs, args)
 		if err != nil {
 			return err
 		}
-		if err := need(pos, 2, "new <task> <repo,repo> [--from ref] [--hotfix]"); err != nil {
+		if err := need(pos, 1, "adopt <old-workspace>"); err != nil {
 			return err
 		}
-		t, err := w.New(pos[0], core.NewOpts{Repos: strings.Split(pos[1], ","), From: *from, Hotfix: *hotfix})
+		lines, err := w.Adopt(pos[0])
+		for _, l := range lines {
+			fmt.Println("  " + l)
+		}
+		if len(lines) > 0 {
+			fmt.Println("next, per task in progress: siding new <task> <repos> --branch repo=branch,... --docs <old-workspace>/docs/<folder>")
+		}
+		return err
+
+	case "new":
+		from := fs.String("from", "", "base ref for all repos, or repo=ref,repo=ref")
+		hotfix := fs.Bool("hotfix", false, "hotfix track (needs --from)")
+		branch := fs.String("branch", "", "existing branch for all repos, or repo=branch,repo=branch")
+		docs := fs.String("docs", "", "existing docs folder to move into the task docs")
+		pos, err := parse(fs, args)
+		if err != nil {
+			return err
+		}
+		if err := need(pos, 2, "new <task> <repo,repo> [--from ref] [--hotfix] [--branch b] [--docs dir]"); err != nil {
+			return err
+		}
+		t, err := w.New(pos[0], core.NewOpts{Repos: strings.Split(pos[1], ","), From: *from, Hotfix: *hotfix, Branch: *branch, Docs: *docs})
 		if t != nil {
 			for _, r := range t.Repos {
 				fmt.Printf("  %-12s %s from %s (%.7s)\n", r.Name, r.Branch, r.Base, r.BaseCommit)

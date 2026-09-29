@@ -26,6 +26,10 @@ This track reviews the finished task `{{.Task}}` against the latest base. Its do
 {{end}}
 Report first: write `review.md`, then turn the findings to fix into `prd.md`, run `siding submit {{$.Task}}` and stop. Follow the deep-review skill.
 
+{{end}}{{if .Adopt}}## Adopted task
+
+Work on this task started before siding. Its existing docs, if any, are in the task docs folder; the branches above may already hold commits. Before anything else, follow the adopt skill: write `prd.md` for the remaining work, run `siding submit {{.Task}}` and stop.
+
 {{end}}## Rules
 {{range .Rules}}
 {{.}}

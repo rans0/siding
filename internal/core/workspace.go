@@ -113,7 +113,6 @@ func Init(dir string) error {
 	files := map[string]string{
 		configFile:                 string(tmpl),
 		localFile:                  "# per machine, gitignored\nbranch_prefix = \"\"   # e.g. \"rans\" gives branches rans/<task>\nref_only = []\n",
-		".gitignore":               localFile + "\nrepos/\ntracks/\n.siding/\n",
 		"knowledge/inbox/.gitkeep": "",
 		"knowledge/repos/.gitkeep": "",
 	}
@@ -121,6 +120,16 @@ func Init(dir string) error {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			return err
 		}
+	}
+	// Append, not overwrite: init may adopt a folder that already has a .gitignore.
+	gi, err := os.OpenFile(filepath.Join(dir, ".gitignore"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	_, err = gi.WriteString(localFile + "\nrepos/\ntracks/\n.siding/\n")
+	gi.Close()
+	if err != nil {
+		return err
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".git")); errors.Is(err, fs.ErrNotExist) {
 		_, err = git(dir, "init", "-q")
@@ -177,24 +186,91 @@ func (w *Workspace) path(parts ...string) string {
 	return filepath.Join(append([]string{w.Root}, parts...)...)
 }
 
-// RepoAdd clones url into repos/.
-func (w *Workspace) RepoAdd(url string, refOnly bool) (string, error) {
-	name := strings.TrimSuffix(filepath.Base(strings.TrimRight(url, "/")), ".git")
+// RepoAdd clones url into repos/. A local clone (e.g. from an old workspace) is copied with
+// all its local branches, including unpushed commits, and origin pointed at its real remote;
+// the source is left untouched. note names the branch it was on.
+func (w *Workspace) RepoAdd(url string, refOnly bool) (name, note string, err error) {
+	name = strings.TrimSuffix(filepath.Base(strings.TrimRight(url, "/")), ".git")
 	name = strings.ToLower(name[strings.LastIndex(name, ":")+1:])
 	if err := validName("repo", name); err != nil {
-		return "", err
+		return "", "", err
 	}
-	if _, err := os.Stat(w.path("repos", name)); err == nil {
-		return "", fmt.Errorf("repos/%s already exists", name)
+	dest := w.path("repos", name)
+	if _, err := os.Stat(dest); err == nil {
+		return "", "", fmt.Errorf("repos/%s already exists", name)
 	}
-	if _, err := git(w.path("repos"), "clone", "-q", url, name); err != nil {
-		return "", err
+	if _, err := os.Stat(filepath.Join(url, ".git")); err == nil {
+		if note, err = copyClone(url, dest); err != nil {
+			os.RemoveAll(dest)
+			return "", "", err
+		}
+	} else if _, err := git(w.path("repos"), "clone", "-q", url, name); err != nil {
+		return "", "", err
 	}
 	if refOnly && !slices.Contains(w.Local.RefOnly, name) {
 		w.Local.RefOnly = append(w.Local.RefOnly, name)
-		return name, w.saveLocal()
+		return name, note, w.saveLocal()
 	}
-	return name, nil
+	return name, note, nil
+}
+
+// copyClone clones a local clone into dest with its local and origin branches, then points
+// origin at the source's remote. HEAD is detached so every branch is free for a worktree.
+func copyClone(src, dest string) (string, error) {
+	src, _ = filepath.Abs(src)
+	remote, err := git(src, "remote", "get-url", "origin")
+	if err != nil {
+		return "", fmt.Errorf("%s has no origin remote", src)
+	}
+	if _, err := git(filepath.Dir(dest), "clone", "-q", "--no-checkout", src, dest); err != nil {
+		return "", err
+	}
+	if _, err := git(dest, "fetch", "-q", "--update-head-ok", "--prune", src,
+		"+refs/heads/*:refs/heads/*", "+refs/remotes/origin/*:refs/remotes/origin/*", "+refs/tags/*:refs/tags/*"); err != nil {
+		return "", err
+	}
+	if _, err := git(dest, "remote", "set-url", "origin", remote); err != nil {
+		return "", err
+	}
+	if _, err := git(dest, "checkout", "-q", "--detach", "HEAD"); err != nil {
+		return "", err
+	}
+	branch, _ := git(src, "branch", "--show-current")
+	note := "copied"
+	if branch != "" {
+		note += ", was on branch " + branch
+	}
+	if out, _ := git(src, "status", "--porcelain"); out != "" {
+		note += "; WARNING: uncommitted changes in " + src + " were not copied"
+	}
+	return note, nil
+}
+
+// Adopt copies every git clone directly under old (an existing workspace) into repos/,
+// and returns one line per repo. Old is only read.
+func (w *Workspace) Adopt(old string) ([]string, error) {
+	entries, err := os.ReadDir(old)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	var errs []error
+	for _, e := range entries {
+		dir := filepath.Join(old, e.Name())
+		if _, err := os.Stat(filepath.Join(dir, ".git")); !e.IsDir() || err != nil {
+			continue
+		}
+		name, note, err := w.RepoAdd(dir, false)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", e.Name(), err))
+			continue
+		}
+		out = append(out, name+": "+note)
+	}
+	if len(out) == 0 && len(errs) == 0 {
+		return nil, fmt.Errorf("no git clones found in %s", old)
+	}
+	return out, errors.Join(errs...)
 }
 
 type RepoInfo struct {

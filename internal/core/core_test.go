@@ -52,7 +52,7 @@ func TestLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.RepoAdd(filepath.Join(tmp, "app.git"), false); err != nil {
+	if _, _, err := w.RepoAdd(filepath.Join(tmp, "app.git"), false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.New("Bad Name", NewOpts{Repos: []string{"app"}}); err == nil {
@@ -258,5 +258,75 @@ func TestPRGateAndTitle(t *testing.T) {
 	os.WriteFile(prd, []byte("intro\n# Add promo codes\n"), 0o644)
 	if got := prTitle(prd, "p"); got != "Add promo codes" {
 		t.Fatalf("title = %q", got)
+	}
+}
+
+// TestAdopt: a new workspace copies clones (unpushed branch included) and docs from an old
+// workspace, leaving the old one untouched.
+func TestAdopt(t *testing.T) {
+	tmp, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("GIT_AUTHOR_NAME", "t")
+	t.Setenv("GIT_AUTHOR_EMAIL", "t@t")
+	t.Setenv("GIT_COMMITTER_NAME", "t")
+	t.Setenv("GIT_COMMITTER_EMAIL", "t@t")
+	src := filepath.Join(tmp, "src")
+	os.MkdirAll(src, 0o755)
+	gitT(t, src, "init", "-q", "-b", "main")
+	os.WriteFile(filepath.Join(src, "a.txt"), []byte("a"), 0o644)
+	gitT(t, src, "add", ".")
+	gitT(t, src, "commit", "-qm", "init")
+	gitT(t, tmp, "clone", "-q", "--bare", src, "app.git")
+
+	// old workspace: a clone on a feature branch with an unpushed commit, a dirty file, loose docs
+	old := filepath.Join(tmp, "old")
+	app := filepath.Join(old, "app")
+	os.MkdirAll(filepath.Join(old, "docs", "PROMO"), 0o755)
+	os.WriteFile(filepath.Join(old, "docs", "PROMO", "TASKS.md"), []byte("tasks"), 0o644)
+	gitT(t, old, "clone", "-q", filepath.Join(tmp, "app.git"), "app")
+	gitT(t, app, "checkout", "-qb", "feature/promo")
+	os.WriteFile(filepath.Join(app, "b.txt"), []byte("b"), 0o644)
+	gitT(t, app, "add", ".")
+	gitT(t, app, "commit", "-qm", "wip")
+	os.WriteFile(filepath.Join(app, "dirty"), nil, 0o644)
+
+	ws := filepath.Join(tmp, "ws")
+	if err := Init(ws); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(ws, "siding.toml"), []byte("[defaults]\nbase = \"origin/main\"\n"), 0o644)
+	w, err := Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines, err := w.Adopt(old)
+	if err != nil || len(lines) != 1 || !strings.Contains(lines[0], "feature/promo") || !strings.Contains(lines[0], "not copied") {
+		t.Fatal(lines, err)
+	}
+	if u := gitT(t, filepath.Join(ws, "repos", "app"), "remote", "get-url", "origin"); u != filepath.Join(tmp, "app.git") {
+		t.Fatalf("origin = %s", u)
+	}
+
+	tr, err := w.New("promo", NewOpts{Repos: []string{"app"}, Branch: "app=feature/promo", Docs: filepath.Join(old, "docs", "PROMO")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(ws, "tracks/promo/app")
+	if _, err := os.Stat(filepath.Join(wt, "b.txt")); err != nil || tr.Repos[0].Branch != "feature/promo" {
+		t.Fatal("unpushed branch not adopted")
+	}
+	if b, _ := os.ReadFile(filepath.Join(ws, tr.Docs, "TASKS.md")); string(b) != "tasks" {
+		t.Fatal("docs not copied")
+	}
+	if _, err := os.Stat(filepath.Join(old, "docs", "PROMO", "TASKS.md")); err != nil {
+		t.Fatal("old docs touched")
+	}
+	if gitT(t, app, "branch", "--show-current") != "feature/promo" {
+		t.Fatal("old clone touched")
+	}
+	agents, _ := os.ReadFile(filepath.Join(ws, "tracks/promo/AGENTS.md"))
+	for _, want := range []string{"Adopted task", filepath.Join("knowledge", "skills", "adopt.md")} {
+		if !strings.Contains(string(agents), want) {
+			t.Errorf("AGENTS.md missing %q", want)
+		}
 	}
 }
