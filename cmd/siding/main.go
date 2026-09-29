@@ -20,8 +20,11 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding repo add <url|dir> [--ref-only]     clone into repos/ (a local clone is copied with its branches)
   siding adopt <old-workspace>               copy every clone in an old workspace into repos/
   siding repo ls                             repos and the tracks using them
-  siding new <task> <repos> [--from ref|a=x,b=y] [--hotfix] [--branch name|a=x,b=y] [--docs dir]
-                                             --branch: branch name as is; --docs: adopt work started before siding
+  siding new <task> <repo,repo> [flags]      create a track: one worktree per repo
+                                             --from ref|a=x,b=y   base (default: siding.toml)
+                                             --hotfix             hotfix track (needs --from)
+                                             --branch name|a=x,b=y  branch name as is, no prefix
+                                             --docs dir           adopt docs of work started before siding
   siding ls                                  all tracks
   siding submit <task>                       agent: move the track to its next gate
   siding approve <task> [--back]             you: pass the gate, or send the track back
@@ -29,13 +32,14 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding ui [--port N]                       board on 127.0.0.1
   siding report <task>                       base, commits and diffstat per repo
   siding pr <task>                           after Gate 2: commit, push, open a PR per repo (needs gh)
-  siding next <task>                         after pr: start the next cycle on the same branches (feature B after A)
+  siding next <task>                         after the PR merges: start the next cycle on the same branches (feature B after A)
   siding review <task>                       deep-review a finished task: report, then fix through the gates
   siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
   siding adapter install <harness>           agents|claude|codex|cursor|opencode: tools, skills, harness files
   siding learn                               review knowledge/inbox: accept, edit, skip, delete
   siding doctor                              check tools, skills, config, worktrees, stale facts
-  siding version
+  siding completion zsh|bash                 print shell completion: source <(siding completion zsh)
+  siding version                             print the version
 `
 
 var version = "dev" // set by the release build
@@ -76,6 +80,21 @@ func run(args []string) error {
 	}
 	if args[0] == "version" || args[0] == "--version" {
 		fmt.Println("siding", version)
+		return nil
+	}
+	if args[0] == "__complete" && len(args) == 2 {
+		complete(args[1])
+		return nil
+	}
+	if args[0] == "completion" {
+		switch {
+		case len(args) == 2 && args[1] == "zsh":
+			fmt.Print(zshCompletion)
+		case len(args) == 2 && args[1] == "bash":
+			fmt.Print(bashCompletion)
+		default:
+			return fmt.Errorf("usage: siding completion zsh|bash")
+		}
 		return nil
 	}
 	cmd, args := args[0], args[1:]

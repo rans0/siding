@@ -1,18 +1,25 @@
 version: 2
 project_name: siding
 
+before:
+  hooks: # shell completions shipped in the archive; brew installs them
+    - mkdir -p completions
+    - 'sh -c "go run ./cmd/siding completion zsh > completions/_siding"'
+    - 'sh -c "go run ./cmd/siding completion bash > completions/siding.bash"'
+
 builds:
   - main: ./cmd/siding
     env: [CGO_ENABLED=0]
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
-    ldflags: [-s -w -X main.version={{.Version}}]
+    ldflags: ['-s -w -X main.version={{.Version}}']
 
 archives:
   - formats: [tar.gz]
     format_overrides:
       - goos: windows
         formats: [zip]
+    files: [LICENSE, README.md, completions/*]
 
 checksum:
   name_template: checksums.txt
@@ -23,6 +30,9 @@ homebrew_casks:
     homepage: https://github.com/rans0/siding
     description: One task, one track, across every repo it touches, with any agent.
     license: MIT
+    completions:
+      zsh: completions/_siding
+      bash: completions/siding.bash
 
 scoops:
   - repository: { owner: rans0, name: scoop-bucket, token: "{{ .Env.TAP_TOKEN }}" }

@@ -72,7 +72,8 @@ func (w *Workspace) AdapterInstall(name string) error {
 func commandBody(task, args string) string {
 	return "Run in the shell: `siding " + args + "`\n" +
 		"If the command needs a task name and none was given, use \"" + task + "\".\n" +
-		"Report the output. Never run `siding approve`: gates are the user's. Do not run `siding done` before Gate 2 is approved.\n"
+		"Report the output. Never run `siding approve`: gates are the user's. Do not run `siding done` before Gate 2 is approved.\n" +
+		"Run `siding next` only when the user asks: it archives the cycle's docs and should follow their merged PR.\n"
 }
 
 const commandFront = "---\ndescription: Run a siding workspace command for this track\n"
@@ -117,7 +118,7 @@ func claudeTrack(w *Workspace, t *Track) error {
 	}, "", "  ")
 	files := map[string]string{
 		"CLAUDE.md":                  "@AGENTS.md\n",
-		".claude/commands/siding.md": commandFront + "argument-hint: <ls|submit|report|done> [args]\nallowed-tools: Bash(siding:*)\n---\n" + commandBody(t.Task, "$ARGUMENTS"),
+		".claude/commands/siding.md": commandFront + "argument-hint: <ls|submit|report|pr|next|done> [args]\nallowed-tools: Bash(siding:*)\n---\n" + commandBody(t.Task, "$ARGUMENTS"),
 		".claude/settings.json":      string(settings) + "\n",
 	}
 	return writeFiles(dir, files)

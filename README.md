@@ -92,7 +92,8 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding open <task> [--agent cmd]` | Start the agent in the track in any terminal; if it is already running, attach to it |
 | `siding report <task>` | Base, commits since base and diffstat per repo |
 | `siding pr <task>` | After Gate 2: commit, push and open a PR per repo with `gh`; title and body from `prd.md` |
-| `siding next <task>` | After `pr`: start the next cycle on the same branches; the cycle's prd/plan/testing move to a numbered docs folder |
+| `siding next <task>` | After the PR merges: start the next cycle on the same branches; the cycle's prd/plan/testing move to a numbered docs folder |
+| `siding completion zsh\|bash` | Tab completion with descriptions: commands, task names with their stage, repos, flags. brew installs it (zsh needs `autoload -Uz compinit && compinit` in `~/.zshrc`); otherwise add `source <(siding completion zsh)` after `compinit`, or `eval "$(siding completion bash)"` for bash |
 | `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track diff, docs, live terminal, gate buttons, Inbox and Health |
 | `siding review <task>` | Deep-review a finished task on the latest base: report first, then fix through the gates |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
