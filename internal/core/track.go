@@ -25,8 +25,9 @@ type Track struct {
 	Status  string      `json:"status"`
 	Slot    int         `json:"slot"` // port slot: every configured port + Slot*port_stride
 	Repos   []TrackRepo `json:"repos"`
-	Review  *Track      `json:"review,omitempty"` // the finished task this track reviews
-	Adopt   bool        `json:"adopt,omitempty"`  // work started before siding: docs and branches brought in
+	Review  *Track      `json:"review,omitempty"`  // the finished task this track reviews
+	Adopt   bool        `json:"adopt,omitempty"`   // work started before siding: docs and branches brought in
+	LogSum  string      `json:"log_sum,omitempty"` // sha256 of log.md when the cycle began: next needs a new retro
 }
 
 type TrackRepo struct {

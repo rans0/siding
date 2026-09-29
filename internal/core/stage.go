@@ -1,6 +1,7 @@
 package core
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"strconv"
@@ -96,6 +97,10 @@ func (w *Workspace) Next(task string) (*Track, error) {
 			return nil, fmt.Errorf("%s: %w", r.Name, err)
 		}
 	}
+	sum := fileSum(w.path(t.Docs, "log.md"))
+	if sum == "" || sum == t.LogSum {
+		return nil, fmt.Errorf("log.md has no retro for this cycle; run the retro skill first (%s)", w.path(t.Docs, "log.md"))
+	}
 	n := 1
 	for ; ; n++ {
 		if _, err := os.Stat(w.path(t.Docs, strconv.Itoa(n))); err != nil {
@@ -115,8 +120,17 @@ func (w *Workspace) Next(task string) (*Track, error) {
 	for i := range t.Repos {
 		t.Repos[i].BaseCommit = heads[i]
 	}
-	t.Status, t.Adopt, t.Review = StagePRD, false, nil
+	t.Status, t.Adopt, t.Review, t.LogSum = StagePRD, false, nil, sum
 	return t, w.setStage(t)
+}
+
+// fileSum is the sha256 of a file, or "" when it cannot be read.
+func fileSum(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(b))
 }
 
 func (w *Workspace) setStage(t *Track) error {

@@ -1,8 +1,8 @@
 # retro
 
-Runs before `siding done`, which refuses to remove the track until `log.md` exists.
+Runs once per cycle, after Gate 2: before `siding next` (which refuses until `log.md` changed this cycle) and before `siding done` (which refuses until `log.md` exists).
 
-1. Write `log.md` in the task docs folder: what was built, decisions, anything surprising.
+1. Write `log.md` in the task docs folder: what was built, decisions, anything surprising. On a track with several cycles, append a section per cycle (`## <feature>`); never rewrite earlier sections.
 2. Propose at most N lessons (N is in AGENTS.md; zero is fine) as files in `knowledge/inbox/`, one per file, named `<date>_<task>_<n>.md`:
 
    ```

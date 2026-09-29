@@ -345,6 +345,11 @@ func TestAdopt(t *testing.T) {
 	}
 	gitT(t, wt, "add", "c.txt")
 	gitT(t, wt, "commit", "-qm", "feature A")
+	if _, err := w.Next("promo"); err == nil || !strings.Contains(err.Error(), "retro") {
+		t.Fatalf("want missing retro refusal, got %v", err)
+	}
+	logMD := filepath.Join(ws, tr.Docs, "log.md")
+	os.WriteFile(logMD, []byte("## A\n"), 0o644)
 	nx, err := w.Next("promo")
 	if err != nil {
 		t.Fatal(err)
@@ -361,6 +366,22 @@ func TestAdopt(t *testing.T) {
 	agents, _ = os.ReadFile(filepath.Join(ws, "tracks/promo/AGENTS.md"))
 	if strings.Contains(string(agents), "Adopted task") {
 		t.Error("next cycle still adopted")
+	}
+	// cycle B: the unchanged log.md from A is not a retro for B
+	os.WriteFile(filepath.Join(ws, tr.Docs, "prd.md"), []byte("# B"), 0o644)
+	w.Submit("promo")
+	w.Approve("promo", false)
+	w.Submit("promo")
+	w.Approve("promo", false)
+	if _, err := w.Next("promo"); err == nil || !strings.Contains(err.Error(), "retro") {
+		t.Fatalf("want refusal on A's log.md, got %v", err)
+	}
+	os.WriteFile(logMD, []byte("## A\n## B\n"), 0o644)
+	if _, err := w.Next("promo"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(ws, tr.Docs, "2", "prd.md")); err != nil {
+		t.Fatal("prd.md of B not archived in 2/")
 	}
 
 	// --branch alone (an RC track) is not an adoption
