@@ -51,6 +51,8 @@ siding done add-promo                      # after log.md is written
 7. **Retro.** The agent writes `log.md` and lesson proposals to `knowledge/inbox/`. Review them with `siding learn` or on the board's Inbox.
 8. **Clean up.** After the PRs are merged, `siding done add-promo` removes the worktrees. Docs stay.
 
+One branch for a whole epic (feature A ships, then B and C on the same branch): after A's PR, `siding next add-promo` starts the next cycle in the same track. A's `prd.md`, `plan.md` and `testing.md` move to `docs/<date>_add-promo/1/`, other docs (task lists, contracts) stay, and the base commit moves to the branch tip so `report` and the next PR cover only B. Run `done` once, when the epic is finished. If merging into the target branch conflicts, resolve it in a separate track instead of on the feature branch: `siding new rc-add-promo backend --from origin/develop --branch rc/add-promo`, `git merge feature/add-promo` in its worktree, then Gate 2 and `siding pr` as usual.
+
 Later, to deep-review a finished task: `siding review add-promo` creates track `review-add-promo` on the latest base of the same repos, with the task's commit range and docs in `AGENTS.md`. The agent writes `review.md` (likely issues, repo patterns, PRD still met, performance, tech debt; each finding with severity, `file:line` and a fix), turns the findings into `prd.md` and stops at Gate 1. You pick what gets fixed; the fixes then follow the normal build, Gate 2 and PR flow. `done` keeps a `track.json` in the task docs so this works after the worktrees are gone.
 
 Several tracks can run at once, each in its own terminal, on its own ports. If something looks wrong, run `siding doctor`.
@@ -67,7 +69,7 @@ siding new add-promo backend,web \
   --docs ~/code/old-ws/docs/PROMO            # copied into docs/<date>_add-promo/ as is
 ```
 
-`adopt` prints the branch each clone was on, and warns about uncommitted changes, which are not copied: commit them in the old clone first. Each copy's `origin` points at the real remote. A track with `--branch` or `--docs` starts at `prd` with the adopt skill: the agent reads the old docs and the commits already on the branches, writes `prd.md` for the remaining work, and stops at Gate 1. Copy finished docs anywhere under `docs/` (for example `docs/archive/`); siding ignores folders not named `<date>_<task>`.
+`adopt` prints the branch each clone was on, and warns about uncommitted changes, which are not copied: commit them in the old clone first. Each copy's `origin` points at the real remote. A track with `--docs` starts at `prd` with the adopt skill: the agent reads the old docs and the commits already on the branches, writes `prd.md` for the remaining work, and stops at Gate 1. Copy finished docs anywhere under `docs/` (for example `docs/archive/`); siding ignores folders not named `<date>_<task>`.
 
 Production hotfix from a tag, alongside other tracks on the same repo:
 
@@ -83,13 +85,14 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding repo add <url\|dir> [--ref-only]` | Clone into `repos/` (a local clone is copied with its branches); `--ref-only` repos can't be used in tracks |
 | `siding adopt <old-workspace>` | Copy every clone in an old workspace into `repos/`; the old one is untouched |
 | `siding repo ls` | Repos and the tracks using each |
-| `siding new <task> <repo,repo> [--from ref\|a=x,b=y] [--hotfix] [--branch b\|a=x,b=y] [--docs dir]` | Create a track: worktrees, setup commands, `AGENTS.md`; `--branch`/`--docs` adopt existing work |
+| `siding new <task> <repo,repo> [--from ref\|a=x,b=y] [--hotfix] [--branch b\|a=x,b=y] [--docs dir]` | Create a track: worktrees, setup commands, `AGENTS.md`; `--branch` uses a branch name as is, `--docs` adopts existing docs |
 | `siding ls` | All tracks with stage, uncommitted files and ahead/behind counts |
 | `siding submit <task>` | Agent: move the track to its next gate (Gate 1 needs `prd.md`) |
 | `siding approve <task> [--back]` | You: pass the gate, or send the track back a stage |
 | `siding open <task> [--agent cmd]` | Start the agent in the track in any terminal; if it is already running, attach to it |
 | `siding report <task>` | Base, commits since base and diffstat per repo |
 | `siding pr <task>` | After Gate 2: commit, push and open a PR per repo with `gh`; title and body from `prd.md` |
+| `siding next <task>` | After `pr`: start the next cycle on the same branches; the cycle's prd/plan/testing move to a numbered docs folder |
 | `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track diff, docs, live terminal, gate buttons, Inbox and Health |
 | `siding review <task>` | Deep-review a finished task on the latest base: report first, then fix through the gates |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |

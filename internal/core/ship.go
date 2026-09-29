@@ -113,8 +113,9 @@ func (w *Workspace) prRepo(t *Track, r TrackRepo, title, body string) (url, note
 		return "", note, err
 	}
 	note += "pushed"
-	if u, err := run(dir, "gh", "pr", "view", r.Branch, "--json", "url", "--jq", ".url"); err == nil {
-		return u, note + "; PR already open", nil
+	// Only an open PR counts: on a long-lived branch the earlier cycle's PR is already merged.
+	if u, err := run(dir, "gh", "pr", "list", "--head", r.Branch, "--state", "open", "--json", "url", "--jq", ".[].url"); err == nil && u != "" {
+		return lines(u)[0], note + "; PR already open", nil
 	}
 	args := []string{"pr", "create", "--head", r.Branch, "--title", title, "--body-file", body}
 	if b, ok := strings.CutPrefix(r.Base, "origin/"); ok {

@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Track stages in order. Agents move a track to a gate with Submit; only a human passes it with Approve.
@@ -71,6 +72,50 @@ func (w *Workspace) Approve(task string, back bool) (*Track, error) {
 	if back {
 		t.Status = next[1]
 	}
+	return t, w.setStage(t)
+}
+
+// Next starts the next cycle of a shipped track on the same branches (feature B after A):
+// the cycle's prd.md, plan.md and testing.md move to docs/<n>/, other docs stay, and the
+// base commit moves to the branch tip so report and pr cover only the new work.
+func (w *Workspace) Next(task string) (*Track, error) {
+	t, err := w.LoadTrack(task)
+	if err != nil {
+		return nil, err
+	}
+	if t.Status != StageShip {
+		return nil, fmt.Errorf("track %s is at %q; `siding next` needs a shipped cycle", task, StageLabel[t.Status])
+	}
+	heads := make([]string, len(t.Repos))
+	for i, r := range t.Repos { // check every repo before moving anything
+		dir := w.path("tracks", task, r.Name)
+		if st, err := git(dir, "status", "--porcelain"); err != nil || st != "" {
+			return nil, fmt.Errorf("%s has uncommitted changes; commit first (yourself or `siding pr %s`)", r.Name, task)
+		}
+		if heads[i], err = git(dir, "rev-parse", "HEAD"); err != nil {
+			return nil, fmt.Errorf("%s: %w", r.Name, err)
+		}
+	}
+	n := 1
+	for ; ; n++ {
+		if _, err := os.Stat(w.path(t.Docs, strconv.Itoa(n))); err != nil {
+			break
+		}
+	}
+	dir := w.path(t.Docs, strconv.Itoa(n))
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		return nil, err
+	}
+	for _, f := range []string{"review.md", "prd.md", "plan.md", "testing.md"} {
+		if err := os.Rename(w.path(t.Docs, f), w.path(t.Docs, strconv.Itoa(n), f)); err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+
+	for i := range t.Repos {
+		t.Repos[i].BaseCommit = heads[i]
+	}
+	t.Status, t.Adopt, t.Review = StagePRD, false, nil
 	return t, w.setStage(t)
 }
 

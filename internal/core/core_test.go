@@ -329,4 +329,43 @@ func TestAdopt(t *testing.T) {
 			t.Errorf("AGENTS.md missing %q", want)
 		}
 	}
+
+	// next: after a shipped cycle, feature B starts on the same branch; adopt is dropped
+	if _, err := w.Next("promo"); err == nil {
+		t.Fatal("next before ship accepted")
+	}
+	os.WriteFile(filepath.Join(ws, tr.Docs, "prd.md"), []byte("# A"), 0o644)
+	w.Submit("promo")
+	w.Approve("promo", false)
+	os.WriteFile(filepath.Join(wt, "c.txt"), []byte("c"), 0o644)
+	w.Submit("promo")
+	w.Approve("promo", false)
+	if _, err := w.Next("promo"); err == nil || !strings.Contains(err.Error(), "uncommitted") {
+		t.Fatalf("want uncommitted refusal, got %v", err)
+	}
+	gitT(t, wt, "add", "c.txt")
+	gitT(t, wt, "commit", "-qm", "feature A")
+	nx, err := w.Next("promo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nx.Status != StagePRD || nx.Adopt || nx.Repos[0].BaseCommit != gitT(t, wt, "rev-parse", "HEAD") {
+		t.Fatalf("next track = %+v", nx)
+	}
+	if _, err := os.Stat(filepath.Join(ws, tr.Docs, "1", "prd.md")); err != nil {
+		t.Fatal("prd.md not archived in 1/")
+	}
+	if _, err := os.Stat(filepath.Join(ws, tr.Docs, "TASKS.md")); err != nil {
+		t.Fatal("living docs moved")
+	}
+	agents, _ = os.ReadFile(filepath.Join(ws, "tracks/promo/AGENTS.md"))
+	if strings.Contains(string(agents), "Adopted task") {
+		t.Error("next cycle still adopted")
+	}
+
+	// --branch alone (an RC track) is not an adoption
+	rc, err := w.New("rc", NewOpts{Repos: []string{"app"}, Branch: "rc/promo"})
+	if err != nil || rc.Adopt {
+		t.Fatal("--branch without --docs marked adopted", err)
+	}
 }

@@ -21,7 +21,7 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding adopt <old-workspace>               copy every clone in an old workspace into repos/
   siding repo ls                             repos and the tracks using them
   siding new <task> <repos> [--from ref|a=x,b=y] [--hotfix] [--branch name|a=x,b=y] [--docs dir]
-                                             --branch/--docs adopt work started before siding
+                                             --branch: branch name as is; --docs: adopt work started before siding
   siding ls                                  all tracks
   siding submit <task>                       agent: move the track to its next gate
   siding approve <task> [--back]             you: pass the gate, or send the track back
@@ -29,6 +29,7 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding ui [--port N]                       board on 127.0.0.1
   siding report <task>                       base, commits and diffstat per repo
   siding pr <task>                           after Gate 2: commit, push, open a PR per repo (needs gh)
+  siding next <task>                         after pr: start the next cycle on the same branches (feature B after A)
   siding review <task>                       deep-review a finished task: report, then fix through the gates
   siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
   siding adapter install <harness>           agents|claude|codex|cursor|opencode: tools, skills, harness files
@@ -157,7 +158,7 @@ func run(args []string) error {
 		from := fs.String("from", "", "base ref for all repos, or repo=ref,repo=ref")
 		hotfix := fs.Bool("hotfix", false, "hotfix track (needs --from)")
 		branch := fs.String("branch", "", "existing branch for all repos, or repo=branch,repo=branch")
-		docs := fs.String("docs", "", "existing docs folder to move into the task docs")
+		docs := fs.String("docs", "", "existing docs folder to copy into the task docs; marks the track adopted")
 		pos, err := parse(fs, args)
 		if err != nil {
 			return err
@@ -312,6 +313,21 @@ func run(args []string) error {
 			fmt.Printf("review track ready: %s/tracks/%s\nnext: siding open %s\n", w.Root, t.Task, t.Task)
 		}
 		return err
+
+	case "next":
+		pos, err := parse(fs, args)
+		if err != nil {
+			return err
+		}
+		if err := need(pos, 1, "next <task>"); err != nil {
+			return err
+		}
+		t, err := w.Next(pos[0])
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s: %s; previous prd/plan/testing moved to a numbered folder in %s\n", t.Task, core.StageLabel[t.Status], t.Docs)
+		return nil
 
 	case "done":
 		force := fs.Bool("force", false, "remove even with uncommitted or unpushed work")

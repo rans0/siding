@@ -42,7 +42,7 @@ type NewOpts struct {
 	From   string // "ref" for all repos, or "a=x,b=y" per repo
 	Hotfix bool
 	Review *Track
-	Branch string // "name" for all repos, or "a=x,b=y": existing branches to adopt, no prefix
+	Branch string // "name" for all repos, or "a=x,b=y": branch names used as is, no prefix
 	Docs   string // existing docs folder copied into the task docs; marks the track adopted
 }
 
@@ -118,6 +118,9 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 		return nil, err
 	}
 	if _, err := os.Stat(w.trackDir(task)); err == nil {
+		if _, err := w.LoadTrack(task); err != nil {
+			return nil, fmt.Errorf("tracks/%s exists without .track.json (an interrupted `siding new`?); `siding doctor` shows how to clean it up, then remove the folder", task)
+		}
 		return nil, fmt.Errorf("track %q already exists", task)
 	}
 	if len(o.Repos) == 0 {
@@ -158,7 +161,7 @@ func (w *Workspace) New(task string, o NewOpts) (*Track, error) {
 		Docs:    filepath.Join("docs", time.Now().Format("2006-01-02")+"_"+task),
 		Status:  StagePRD,
 		Review:  o.Review,
-		Adopt:   o.Docs != "" || o.Branch != "",
+		Adopt:   o.Docs != "", // --branch alone (e.g. an RC track) is not an adoption
 	}
 	if t.Slot, err = w.freeSlot(); err != nil {
 		return nil, err
@@ -233,7 +236,11 @@ func (w *Workspace) addWorktree(task, repo, from, branch string, hotfix bool, sl
 		return &TrackRepo{Name: repo, Branch: branch, Base: base, BaseCommit: baseCommit}, fmt.Errorf("worktree created but .env failed: %w", err)
 	}
 	if setup := w.Cfg.Repos[repo].Setup; setup != "" {
-		if err := sh(dest, setup); err != nil {
+		// Streamed: setup like `npm ci` can take minutes and must not look hung.
+		fmt.Fprintf(os.Stderr, "%s: %s\n", repo, setup)
+		cmd := shell(setup)
+		cmd.Dir, cmd.Stdout, cmd.Stderr = dest, os.Stderr, os.Stderr
+		if err := cmd.Run(); err != nil {
 			return &TrackRepo{Name: repo, Branch: branch, Base: base, BaseCommit: baseCommit}, fmt.Errorf("worktree created but setup failed: %w", err)
 		}
 	}
