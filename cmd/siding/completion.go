@@ -78,6 +78,7 @@ _siding() {
              '--branch[branch name as is, or repo=branch,...]' '--docs[existing docs folder to adopt]' ;;
       approve) _values flag '--back[send the track back to the stage before]' ;;
       done) _values flag '--force[remove even with uncommitted or unpushed work]' ;;
+      pr) _values flag '--push-only[commit and push, open no PR]' ;;
       open) _values flag '--agent[agent command to start]' ;;
       ui) _values flag '--port[port on 127.0.0.1]' ;;
       repo) _values flag '--ref-only[read-only reference repo]' ;;

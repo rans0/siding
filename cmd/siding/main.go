@@ -31,7 +31,7 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding open <task> [--agent cmd]           start the agent in the track, or attach to it
   siding ui [--port N]                       board on 127.0.0.1
   siding report <task>                       base, commits and diffstat per repo
-  siding pr <task>                           after Gate 2: commit, push, open a PR per repo (needs gh)
+  siding pr <task> [--push-only]             after Gate 2: commit, push, open a PR per repo (needs gh unless --push-only)
   siding next <task>                         after the PR merges: start the next cycle on the same branches (feature B after A)
   siding review <task>                       deep-review a finished task: report, then fix through the gates
   siding done <task> [--force]               remove the track's worktrees (needs log.md; docs stay)
@@ -269,6 +269,7 @@ func run(args []string) error {
 		return http.ListenAndServe(addr, ui.Handler(w))
 
 	case "report", "pr":
+		pushOnly := fs.Bool("push-only", false, "commit and push, open no PR")
 		pos, err := parse(fs, args)
 		if err != nil {
 			return err
@@ -277,7 +278,7 @@ func run(args []string) error {
 			return err
 		}
 		if cmd == "pr" {
-			res, err := w.PR(pos[0])
+			res, err := w.PR(pos[0], *pushOnly)
 			if err != nil {
 				return err
 			}

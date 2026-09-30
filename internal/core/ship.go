@@ -69,9 +69,9 @@ type PRResult struct {
 	Err             error
 }
 
-// PR commits, pushes and opens a pull request per repo. Allowed only after Gate 2.
-// Title is the first heading of prd.md; the body is prd.md itself.
-func (w *Workspace) PR(task string) ([]PRResult, error) {
+// PR commits, pushes and opens a pull request per repo; pushOnly stops after the push.
+// Allowed only after Gate 2. Title is the first heading of prd.md; the body is prd.md itself.
+func (w *Workspace) PR(task string, pushOnly bool) ([]PRResult, error) {
 	t, err := w.LoadTrack(task)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (w *Workspace) PR(task string) ([]PRResult, error) {
 	if t.Status != StageShip {
 		return nil, fmt.Errorf("track %s is at %q; `siding pr` needs Gate 2 approved", task, StageLabel[t.Status])
 	}
-	if _, err := exec.LookPath("gh"); err != nil {
+	if _, err := exec.LookPath("gh"); err != nil && !pushOnly {
 		return nil, errors.New("gh not found; install GitHub CLI and run `gh auth login`")
 	}
 	prd := w.path(t.Docs, "prd.md")
@@ -87,13 +87,13 @@ func (w *Workspace) PR(task string) ([]PRResult, error) {
 	var out []PRResult
 	for _, r := range t.Repos {
 		res := PRResult{Repo: r.Name}
-		res.URL, res.Note, res.Err = w.prRepo(t, r, title, prd)
+		res.URL, res.Note, res.Err = w.prRepo(t, r, title, prd, pushOnly)
 		out = append(out, res)
 	}
 	return out, nil
 }
 
-func (w *Workspace) prRepo(t *Track, r TrackRepo, title, body string) (url, note string, err error) {
+func (w *Workspace) prRepo(t *Track, r TrackRepo, title, body string, pushOnly bool) (url, note string, err error) {
 	dir := filepath.Join(w.trackDir(t.Task), r.Name)
 	if st, err := git(dir, "status", "--porcelain"); err != nil {
 		return "", "", err
@@ -113,6 +113,9 @@ func (w *Workspace) prRepo(t *Track, r TrackRepo, title, body string) (url, note
 		return "", note, err
 	}
 	note += "pushed"
+	if pushOnly {
+		return "", note, nil
+	}
 	// Only an open PR counts: on a long-lived branch the earlier cycle's PR is already merged.
 	if u, err := run(dir, "gh", "pr", "list", "--head", r.Branch, "--state", "open", "--json", "url", "--jq", ".[].url"); err == nil && u != "" {
 		return lines(u)[0], note + "; PR already open", nil

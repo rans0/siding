@@ -112,7 +112,12 @@ func TestLifecycle(t *testing.T) {
 	if err := w.Done("feat", false); err == nil || !strings.Contains(err.Error(), "unpushed") {
 		t.Fatalf("want unpushed refusal, got %v", err)
 	}
-	gitT(t, wt, "push", "-q", "origin", "me/feat")
+	ship, _ := w.LoadTrack("feat")
+	ship.Status = StageShip
+	w.saveTrack(ship)
+	if res, err := w.PR("feat", true); err != nil || res[0].Err != nil || res[0].Note != "pushed" || res[0].URL != "" {
+		t.Fatalf("push-only: %+v %v", res, err)
+	}
 	if err := w.Done("feat", false); err == nil || !strings.Contains(err.Error(), "log.md") {
 		t.Fatalf("want missing log.md refusal, got %v", err)
 	}
@@ -247,7 +252,7 @@ func TestPRGateAndTitle(t *testing.T) {
 	w := &Workspace{Root: ws}
 	os.MkdirAll(filepath.Join(ws, "tracks/p"), 0o755)
 	w.saveTrack(&Track{Task: "p", Status: StageGate2, Docs: "docs/p"})
-	if _, err := w.PR("p"); err == nil || !strings.Contains(err.Error(), "Gate 2") {
+	if _, err := w.PR("p", false); err == nil || !strings.Contains(err.Error(), "Gate 2") {
 		t.Fatalf("pr before approval: %v", err)
 	}
 	prd := filepath.Join(ws, "prd.md")
