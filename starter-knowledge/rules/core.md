@@ -2,3 +2,4 @@
 - Stay in scope: only the repos listed in this track, only what `prd.md` covers.
 - Prove it works: run the repo's tests and record the evidence in `testing.md`.
 - Propose, never write, permanent knowledge: lessons go to `knowledge/inbox/` only.
+- Code explains itself: clear names and small functions, not comments. Comment only the why the code cannot show (a hidden constraint, a workaround, a security reason); never restate what the code does or record history (`// added X`, `// fixed Y`).
