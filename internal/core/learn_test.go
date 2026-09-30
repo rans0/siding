@@ -28,9 +28,10 @@ func TestLearnAndDoctor(t *testing.T) {
 	write("2.md", "---\nrepo: backend\ntrack: promo\ndate: 2026-09-28\ncommit: a1b2c3d\n---\nOld text\n")
 	write("3.md", "---\nrepo: skill:debug\ntrack: promo\n---\n# debug\nBisect first.\n")
 	write("4.md", "---\nrepo: nope\n---\nx\n")
+	write("5.md", "---\nrepo: rule:style\ntrack: promo\ndate: 2026-09-28\n---\nNo comments that restate code.\n")
 
 	props, err := w.Inbox()
-	if err != nil || len(props) != 4 || props[0].Repo != "backend" || props[0].Commit != "a1b2c3d" {
+	if err != nil || len(props) != 5 || props[0].Repo != "backend" || props[0].Commit != "a1b2c3d" {
 		t.Fatalf("inbox %+v %v", props, err)
 	}
 	if _, err := w.Accept("1.md", ""); err != nil {
@@ -40,6 +41,9 @@ func TestLearnAndDoctor(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := w.Accept("3.md", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Accept("5.md", ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.Reject("4.md"); err != nil {
@@ -58,6 +62,9 @@ func TestLearnAndDoctor(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(ws, "knowledge/skills/debug.md")); !strings.Contains(string(b), "Bisect") {
 		t.Fatal("skill not created")
+	}
+	if b, _ := os.ReadFile(filepath.Join(ws, "knowledge/rules/style.md")); string(b) != "- No comments that restate code. <!-- verified promo 2026-09-28 -->\n" {
+		t.Fatalf("rule:\n%s", b)
 	}
 
 	// orphaned worktree: git knows it, no track claims it

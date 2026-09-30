@@ -7,7 +7,7 @@ Runs once per cycle, after Gate 2: before `siding next` (which refuses until `lo
 
    ```
    ---
-   repo: backend            # or "skill:<name>" for a new skill
+   repo: backend            # or "skill:<name>" for a new skill, "rule:<name>" for a rule every task follows
    track: add-promo
    date: 2026-09-28
    commit: a1b2c3d          # commit where the fact was verified

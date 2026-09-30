@@ -125,7 +125,7 @@ Before `done`, the agent's retro writes up to `retro_max` lesson proposals to `k
       (a)ccept  (e)dit  (s)kip  (d)elete >
 ```
 
-Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified <commit> <track> <date> -->` marker, and every later track touching that repo gets them in its `AGENTS.md`. A proposal with `repo: skill:<name>` becomes `knowledge/skills/<name>.md`. `siding doctor` flags a fact as stale when a backticked path in it (containing `/`) no longer exists in the repo's main clone.
+Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified <commit> <track> <date> -->` marker, and every later track touching that repo gets them in its `AGENTS.md`. A proposal with `repo: skill:<name>` becomes `knowledge/skills/<name>.md`; one with `repo: rule:<name>` is appended to `knowledge/rules/<name>.md`, loaded into every track. Agents also propose a lesson as soon as you state a standing preference mid-session, so `siding learn` can pick it up before the task ends. `siding doctor` flags a fact as stale when a backticked path in it (containing `/`) no longer exists in the repo's main clone.
 
 ## Workspace layout
 

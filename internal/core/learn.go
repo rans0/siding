@@ -12,7 +12,7 @@ import (
 // Proposal is one lesson in knowledge/inbox/, written by the retro skill.
 type Proposal struct {
 	File   string // base name in knowledge/inbox/
-	Repo   string // repo name, or "skill:<name>" for a new skill
+	Repo   string // repo name, "skill:<name>" for a new skill, or "rule:<name>" for a rule
 	Track  string
 	Date   string
 	Commit string
@@ -69,7 +69,8 @@ func parseProposal(s string) Proposal {
 
 // Accept moves a proposal into permanent knowledge. body replaces the proposal's text when
 // non-empty (the "edit" choice). Repo facts are appended to knowledge/repos/<repo>.md with a
-// verified marker; "skill:<name>" becomes knowledge/skills/<name>.md.
+// verified marker; "skill:<name>" becomes knowledge/skills/<name>.md; "rule:<name>" is appended
+// to knowledge/rules/<name>.md, which every track's AGENTS.md includes.
 func (w *Workspace) Accept(file, body string) (string, error) {
 	src, err := w.inboxFile(file)
 	if err != nil {
@@ -96,12 +97,18 @@ func (w *Workspace) Accept(file, body string) (string, error) {
 			return "", fmt.Errorf("skill %s already exists; edit %s by hand", name, dest)
 		}
 		text = p.Body + "\n"
+	} else if name, ok := strings.CutPrefix(p.Repo, "rule:"); ok {
+		if err := validName("rule", name); err != nil {
+			return "", err
+		}
+		dest = w.path("knowledge", "rules", name+".md")
+		text = fact(p)
 	} else {
 		if err := validName("repo", p.Repo); err != nil {
 			return "", err
 		}
 		dest = w.path("knowledge", "repos", p.Repo+".md")
-		text = strings.TrimSpace("- "+strings.ReplaceAll(p.Body, "\n", "\n  ")+" "+marker(p)) + "\n"
+		text = fact(p)
 		if _, err := os.Stat(dest); err != nil {
 			text = "# " + p.Repo + "\n\n" + text
 		}
@@ -118,6 +125,11 @@ func (w *Workspace) Accept(file, body string) (string, error) {
 		return "", err
 	}
 	return dest, os.Remove(src)
+}
+
+// fact renders a proposal as one bullet with its verified marker.
+func fact(p Proposal) string {
+	return strings.TrimSpace("- "+strings.ReplaceAll(p.Body, "\n", "\n  ")+" "+marker(p)) + "\n"
 }
 
 // marker records where a fact came from; doctor uses the facts' paths to flag staleness.

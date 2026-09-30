@@ -3,3 +3,4 @@
 - Prove it works: run the repo's tests and record the evidence in `testing.md`.
 - Propose, never write, permanent knowledge: lessons go to `knowledge/inbox/` only.
 - Code explains itself: clear names and small functions, not comments. Comment only the why the code cannot show (a hidden constraint, a workaround, a security reason); never restate what the code does or record history (`// added X`, `// fixed Y`).
+- When the user states a standing preference or correction, propose it to `knowledge/inbox/` right away (see the retro skill for the format); don't wait for the retro.
