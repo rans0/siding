@@ -7,7 +7,7 @@ Runs once per cycle, after Gate 2: before `siding next` (which refuses until `lo
 
    ```
    ---
-   repo: backend            # or "skill:<name>" for a new skill, "rule:<name>" for a rule every task follows
+   repo: backend            # or "skill:<name>" to add to or create a skill, "rule:<name>" for a rule every task follows
    track: add-promo
    date: 2026-09-28
    commit: a1b2c3d          # commit where the fact was verified
@@ -16,4 +16,5 @@ Runs once per cycle, after Gate 2: before `siding next` (which refuses until `lo
    ```
 
 3. Only propose facts a future task would not find quickly on its own. No task summaries.
+   Pick the target: `rule:<name>` for a preference that applies to all code, `skill:<name>` for a stage-specific procedure, a repo name for a fact about that repo.
 4. Collect every `ponytail:` comment in the diff into one proposal tagged as tech debt.

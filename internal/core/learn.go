@@ -69,7 +69,8 @@ func parseProposal(s string) Proposal {
 
 // Accept moves a proposal into permanent knowledge. body replaces the proposal's text when
 // non-empty (the "edit" choice). Repo facts are appended to knowledge/repos/<repo>.md with a
-// verified marker; "skill:<name>" becomes knowledge/skills/<name>.md; "rule:<name>" is appended
+// verified marker; "skill:<name>" becomes knowledge/skills/<name>.md, or is appended to it as a
+// fact when the skill exists; "rule:<name>" is appended
 // to knowledge/rules/<name>.md, which every track's AGENTS.md includes.
 func (w *Workspace) Accept(file, body string) (string, error) {
 	src, err := w.inboxFile(file)
@@ -93,10 +94,10 @@ func (w *Workspace) Accept(file, body string) (string, error) {
 			return "", err
 		}
 		dest = w.path("knowledge", "skills", name+".md")
-		if _, err := os.Stat(dest); err == nil {
-			return "", fmt.Errorf("skill %s already exists; edit %s by hand", name, dest)
-		}
 		text = p.Body + "\n"
+		if _, err := os.Stat(dest); err == nil {
+			text = "\n" + fact(p)
+		}
 	} else if name, ok := strings.CutPrefix(p.Repo, "rule:"); ok {
 		if err := validName("rule", name); err != nil {
 			return "", err
