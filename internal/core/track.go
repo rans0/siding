@@ -329,7 +329,8 @@ func (w *Workspace) Done(task string, force bool) error {
 			args = []string{"worktree", "remove", "--force", dir}
 		}
 		if _, err := os.Stat(dir); err == nil {
-			if _, err := git(w.path("repos", r.Name), args...); err != nil {
+			// --force also covers orphaned worktrees git no longer tracks; RemoveAll below deletes them.
+			if _, err := git(w.path("repos", r.Name), args...); err != nil && !force {
 				return fmt.Errorf("%s: %w (track left in place)", r.Name, err)
 			}
 		}
