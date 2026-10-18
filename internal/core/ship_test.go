@@ -17,6 +17,10 @@ func trackT(t *testing.T) (*Workspace, *Track, string) {
 	for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
 		t.Setenv(k, "t@t")
 	}
+	// Windows runners default to autocrlf, whose stderr warnings must not reach parsed output.
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.autocrlf")
+	t.Setenv("GIT_CONFIG_VALUE_0", "true")
 	src := filepath.Join(tmp, "src")
 	os.MkdirAll(src, 0o755)
 	gitT(t, src, "init", "-q", "-b", "main")

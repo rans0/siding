@@ -119,7 +119,7 @@ func (w *Workspace) Files(t *Track, repo, scope string) (files []FileChange, hid
 	if err != nil {
 		return nil, 0, err
 	}
-	out, err := git(dir, append([]string{"diff", "--numstat", "-z", "--no-renames"}, rng...)...)
+	out, err := gitOut(dir, append([]string{"diff", "--numstat", "-z", "--no-renames"}, rng...)...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -137,7 +137,7 @@ func (w *Workspace) Files(t *Track, repo, scope string) (files []FileChange, hid
 	if scope != ScopeUncommitted {
 		return files, 0, nil
 	}
-	u, _ := git(dir, "ls-files", "-z", "--others", "--exclude-standard")
+	u, _ := gitOut(dir, "ls-files", "-z", "--others", "--exclude-standard")
 	shown := 0
 	for _, path := range strings.Split(u, "\x00") {
 		switch {
@@ -172,6 +172,20 @@ func (w *Workspace) FileDiff(t *Track, repo, scope, path string) (diff string, c
 		return gitCapped(dir, maxDiffBytes, args...)
 	}
 	return "", false, fmt.Errorf("%s is not changed in %s", path, scope)
+}
+
+// gitOut runs git for output that gets parsed: stdout only, so warnings such as
+// autocrlf's "LF will be replaced by CRLF" cannot land inside a record.
+func gitOut(dir string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %s", strings.Join(args, " "), strings.TrimSpace(stderr.String()))
+	}
+	return string(out), nil
 }
 
 // gitCapped streams git's stdout and stops at max bytes, cut at a line end, so a huge
