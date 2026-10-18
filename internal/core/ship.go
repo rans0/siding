@@ -41,8 +41,9 @@ func (w *Workspace) Report(t *Track) []RepoReport {
 
 // Changes of one repo in a track, split for review.
 type Changes struct {
-	Committed   string // base commit to HEAD
-	Uncommitted string // HEAD to working tree, untracked files as new-file diffs
+	Committed   string   // base commit to HEAD
+	Uncommitted string   // HEAD to working tree, untracked files as new-file diffs
+	Skipped     []string // untracked files too many or too big to diff
 }
 
 // Untracked files past these limits are listed by name only: a stray build dir must not stall the board.
@@ -67,18 +68,14 @@ func (w *Workspace) Changes(t *Track, repo string) (Changes, error) {
 			return c, err
 		}
 		u, _ := git(dir, "ls-files", "--others", "--exclude-standard")
-		var names []string
 		for i, f := range lines(u) {
 			if fi, err := os.Stat(filepath.Join(dir, f)); i >= maxUntrackedDiffs || err != nil || fi.Size() > maxUntrackedBytes {
-				names = append(names, f)
+				c.Skipped = append(c.Skipped, f)
 				continue
 			}
 			// --no-index exits 1 when files differ, which is always here: the output is the result.
 			d, _ := exec.Command("git", "-C", dir, "diff", "--no-index", "--", os.DevNull, f).Output()
 			c.Uncommitted = strings.TrimSpace(c.Uncommitted + "\n" + strings.TrimSpace(string(d)))
-		}
-		if names != nil {
-			c.Uncommitted += "\n\n# untracked, too many or too big to show:\n" + strings.Join(names, "\n")
 		}
 		return c, nil
 	}

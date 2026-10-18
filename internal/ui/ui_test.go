@@ -161,10 +161,34 @@ func TestCommitPage(t *testing.T) {
 		t.Fatalf("commit link missing:\n%s", page)
 	}
 	code, page := serve(h, "/t/feat/app/"+sha)
-	if code != 200 || !strings.Contains(page, "+committed") || strings.Contains(page, "+wip") {
+	if code != 200 || !strings.Contains(page, "add feature") || !strings.Contains(page, "+committed") || strings.Contains(page, "+wip") {
 		t.Fatalf("commit page %d:\n%s", code, page)
 	}
 	if code, _ := serve(h, "/t/feat/app/HEAD"); code != 404 {
 		t.Errorf("non-sha got %d, want 404", code)
+	}
+}
+
+// Diffs split into one foldable block per file, with +/- counts; big files start folded.
+func TestSplitFiles(t *testing.T) {
+	big := strings.Repeat("+x\n", maxOpenLines+1)
+	d := "diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1 +1 @@\n-old\n+new\n" +
+		"diff --git a/big.txt b/big.txt\n--- /dev/null\n+++ b/big.txt\n@@ -0,0 +1 @@\n" + big
+	files := splitFiles(d)
+	if len(files) != 2 {
+		t.Fatalf("got %d files", len(files))
+	}
+	if f := files[0]; f.Name != "a.go" || f.Add != 1 || f.Del != 1 || !f.Open || len(f.Lines) != 6 {
+		t.Errorf("a.go: %+v", f)
+	}
+	if f := files[1]; f.Name != "big.txt" || f.Add != maxOpenLines+1 || f.Open {
+		t.Errorf("big.txt: name %s add %d open %v", f.Name, f.Add, f.Open)
+	}
+	if splitFiles("") != nil {
+		t.Error("empty diff gave files")
+	}
+	// commit header before the first file is kept as its own block
+	if f := splitFiles("commit abc\nAuthor: t\n\n    msg\ndiff --git a/a b/a\n+x"); len(f) != 2 || f[0].Name != "" || f[1].Name != "a" {
+		t.Errorf("header: %+v", f)
 	}
 }

@@ -9,8 +9,7 @@
 <body>
 <header><h1><a href="/">siding</a> / <a href="/t/{{.T.Task}}">{{.T.Task}}</a> / {{.Repo}}</h1><span><code>{{.SHA}}</code></span></header>
 <div class="detail">
-<pre class="full">{{range .Diff}}<span class="{{.Class}}">{{.Text}}</span>
-{{end}}</pre>
+{{template "files" .Files}}
 </div>
 </body>
 </html>

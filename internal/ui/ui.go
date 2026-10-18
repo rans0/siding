@@ -51,10 +51,22 @@ type diffLine struct{ Class, Text string }
 
 type commit struct{ SHA, Subject string }
 
+// fileDiff is one file of a diff; Name is empty for text before the first file (a commit header).
+type fileDiff struct {
+	Name     string
+	Add, Del int
+	Open     bool
+	Lines    []diffLine
+}
+
+// Files with more lines than this start folded, so one generated file cannot bury the rest.
+const maxOpenLines = 400
+
 type repoReport struct {
 	R                      core.RepoReport
 	Commits                []commit
-	Uncommitted, Committed []diffLine
+	Uncommitted, Committed []fileDiff
+	Skipped                []string
 }
 
 type doc struct{ Name, Body string }
@@ -107,7 +119,7 @@ func Handler(w *core.Workspace) http.Handler {
 				sha, subject, _ := strings.Cut(l, " ")
 				commits = append(commits, commit{sha, subject})
 			}
-			reports = append(reports, repoReport{rep, commits, classify(c.Uncommitted), classify(c.Committed)})
+			reports = append(reports, repoReport{rep, commits, splitFiles(c.Uncommitted), splitFiles(c.Committed), c.Skipped})
 		}
 		var docs []doc
 		for _, name := range []string{"review.md", "prd.md", "plan.md", "testing.md", "log.md"} {
@@ -132,7 +144,7 @@ func Handler(w *core.Workspace) http.Handler {
 			http.Error(rw, err.Error(), http.StatusNotFound)
 			return
 		}
-		render(rw, "commit.html", map[string]any{"T": t, "Repo": r.PathValue("repo"), "SHA": r.PathValue("sha"), "Diff": classify(d)})
+		render(rw, "commit.html", map[string]any{"T": t, "Repo": r.PathValue("repo"), "SHA": r.PathValue("sha"), "Files": splitFiles(d)})
 	})
 	mux.HandleFunc("GET /xterm/", func(rw http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(rw, r, siding.Assets, "web"+r.URL.Path)
@@ -264,6 +276,30 @@ func classify(diff string) []diffLine {
 			c = "del"
 		}
 		out = append(out, diffLine{c, l})
+	}
+	return out
+}
+
+// splitFiles cuts a git diff at each "diff --git" line and counts added and deleted lines.
+func splitFiles(diff string) []fileDiff {
+	var out []fileDiff
+	for _, l := range classify(diff) {
+		if strings.HasPrefix(l.Text, "diff --git ") || out == nil {
+			f := fileDiff{Open: true}
+			if _, b, ok := strings.Cut(l.Text, " b/"); ok && strings.HasPrefix(l.Text, "diff --git ") {
+				f.Name = b
+			}
+			out = append(out, f)
+		}
+		f := &out[len(out)-1]
+		f.Lines = append(f.Lines, l)
+		switch {
+		case l.Class == "add":
+			f.Add++
+		case l.Class == "del":
+			f.Del++
+		}
+		f.Open = len(f.Lines) <= maxOpenLines
 	}
 	return out
 }

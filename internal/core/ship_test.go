@@ -64,6 +64,10 @@ func TestChanges(t *testing.T) {
 	if !strings.Contains(c.Uncommitted, "+++ b/new.txt") || !strings.Contains(c.Uncommitted, "+fresh") {
 		t.Errorf("untracked content missing:\n%s", c.Uncommitted)
 	}
+	os.WriteFile(filepath.Join(wt, "huge.bin"), make([]byte, maxUntrackedBytes+1), 0o644)
+	if c, _ := w.Changes(tr, "app"); len(c.Skipped) != 1 || c.Skipped[0] != "huge.bin" {
+		t.Errorf("skipped = %q", c.Skipped)
+	}
 	if _, err := w.Changes(tr, "nope"); err == nil {
 		t.Error("unknown repo accepted")
 	}

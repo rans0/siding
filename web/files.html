@@ -1,0 +1,2 @@
+{{define "files"}}{{range .}}{{if .Name}}<details class="file"{{if .Open}} open{{end}}><summary><code>{{.Name}}</code> <span class="add">+{{.Add}}</span> <span class="del">-{{.Del}}</span></summary>{{end}}<pre>{{range .Lines}}<span class="{{.Class}}">{{.Text}}</span>
+{{end}}</pre>{{if .Name}}</details>{{end}}{{end}}{{end}}
