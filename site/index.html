@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>siding — one task, one track</title>
+<meta name="description" content="siding is a workspace manager for coding agents. One task, one track, across every repo it touches, with any agent.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f3f1ea; --card: #fbfaf6; --ink: #1b1a17; --sub: #6b675e; --line: #d9d5ca; --grid: #e7e3d8;
+  --rail: #2b2925; --stop: #c2461b; --stop-bg: #f8e6dc; --go: #2f7a46; --amber: #c98a12;
+  --display: "Big Shoulders Display", Impact, sans-serif;
+  --body: "Public Sans", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12110f; --card: #1b1a17; --ink: #ece9e1; --sub: #9a968c; --line: #33312c; --grid: #1c1b18;
+    --rail: #d8d4ca; --stop: #ef7a4a; --stop-bg: #3a2218; --go: #6cc48a; --amber: #e8b04a;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12110f; --card: #1b1a17; --ink: #ece9e1; --sub: #9a968c; --line: #33312c; --grid: #1c1b18;
+  --rail: #d8d4ca; --stop: #ef7a4a; --stop-bg: #3a2218; --go: #6cc48a; --amber: #e8b04a;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+a { color: inherit; }
+code, pre, kbd { font-family: var(--mono); font-size: .88em; }
+:not(pre) > code { background: var(--card); border: 1px solid var(--line); padding: .05em .35em; border-radius: 3px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+section { padding: 96px 0; border-top: 2px solid var(--rail); }
+.eyebrow {
+  font: 500 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--stop);
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+}
+.eyebrow::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--stop); }
+h1, h2, h3 { font-family: var(--display); line-height: .95; margin: 0; text-transform: uppercase; }
+h2 { font-size: clamp(40px, 6vw, 72px); font-weight: 900; max-width: 14ch; }
+h3 { font-size: 24px; font-weight: 800; letter-spacing: .02em; }
+.lede { color: var(--sub); max-width: 60ch; font-size: 18px; margin: 20px 0 0; }
+
+/* nav */
+nav.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+nav.top .wrap { display: flex; align-items: center; gap: 24px; height: 56px; }
+.logo { font: 900 26px/1 var(--display); text-decoration: none; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.logo svg { width: 28px; height: 28px; }
+nav.top ul { list-style: none; display: flex; gap: 20px; margin: 0 0 0 auto; padding: 0; font: 500 13px var(--mono); }
+nav.top ul a { text-decoration: none; color: var(--sub); }
+nav.top ul a:hover { color: var(--ink); }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border: 2px solid var(--rail);
+  font: 600 14px var(--body); text-decoration: none; background: var(--rail); color: var(--paper); border-radius: 2px;
+  transition: transform .15s, box-shadow .15s;
+}
+.btn:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--stop); }
+.btn.ghost { background: transparent; color: var(--ink); }
+@media (max-width: 720px) { nav.top ul li.hide-sm { display: none; } nav.top ul { gap: 14px; } }
+
+/* hero */
+.hero { padding: 72px 0 40px; border-top: 0; }
+.hero h1 { font-size: clamp(64px, 13vw, 168px); font-weight: 900; letter-spacing: -.01em; }
+.hero h1 span { color: var(--stop); }
+.hero .tag { font: 600 clamp(20px, 2.6vw, 28px)/1.3 var(--body); max-width: 26ch; margin: 18px 0 0; }
+.hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: end; }
+@media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; gap: 24px; } }
+.install { background: var(--card); border: 2px solid var(--rail); box-shadow: 6px 6px 0 var(--rail); }
+.install [role=tablist] { display: flex; border-bottom: 1px solid var(--line); }
+.install [role=tab] {
+  flex: 1; padding: 10px; background: none; border: 0; border-right: 1px solid var(--line);
+  font: 500 12px var(--mono); color: var(--sub); cursor: pointer; text-transform: uppercase; letter-spacing: .08em;
+}
+.install [role=tab]:last-child { border-right: 0; }
+.install [role=tab][aria-selected=true] { color: var(--ink); background: var(--paper); box-shadow: inset 0 -3px 0 var(--stop); }
+.install pre { margin: 0; padding: 18px 16px; overflow-x: auto; white-space: pre; }
+.cmdline { display: flex; align-items: flex-start; }
+.cmdline pre { flex: 1; }
+.copy {
+  margin: 10px; padding: 6px 10px; border: 1px solid var(--line); background: var(--paper); color: var(--sub);
+  font: 500 11px var(--mono); cursor: pointer; border-radius: 2px;
+}
+.copy:hover { color: var(--ink); border-color: var(--ink); }
+.prompt { color: var(--stop); user-select: none; }
+.cmt { color: var(--sub); }
+.diagram { margin-top: 56px; }
+.diagram svg { width: 100%; height: auto; display: block; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 28px; font: 500 12px var(--mono); color: var(--sub); margin-top: 12px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
+.principles { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid var(--rail); margin-top: 48px; background: var(--card); }
+.principles div { padding: 18px; border-right: 1px solid var(--line); }
+.principles div:last-child { border-right: 0; }
+.principles b { display: block; font: 800 20px/1 var(--display); text-transform: uppercase; margin-bottom: 6px; }
+.principles p { margin: 0; color: var(--sub); font-size: 14px; }
+@media (max-width: 860px) { .principles { grid-template-columns: 1fr 1fr; } .principles div:nth-child(2) { border-right: 0; } .principles div:nth-child(-n+2) { border-bottom: 1px solid var(--line); } }
+@media (max-width: 480px) { .principles { grid-template-columns: 1fr; } .principles div { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+/* workflow */
+.rail { position: relative; display: grid; grid-template-columns: repeat(8, 1fr); margin: 56px 0 32px; }
+.rail::before { content: ""; position: absolute; left: 6%; right: 6%; top: 22px; height: 6px; background: repeating-linear-gradient(90deg, var(--rail) 0 3px, transparent 3px 12px); }
+.rail .progress { position: absolute; left: 6%; top: 23px; height: 4px; background: var(--stop); width: 0; transition: width .6s cubic-bezier(.6,0,.2,1); }
+.station { position: relative; background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--sub); font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+.station .dot { width: 50px; height: 50px; border-radius: 50%; border: 3px solid var(--rail); background: var(--paper); display: grid; place-items: center; font: 800 20px var(--display); color: var(--ink); transition: background .3s, color .3s, transform .3s; }
+.station.gate .dot { border-radius: 4px; transform: rotate(45deg) scale(.86); }
+.station.gate .dot span { transform: rotate(-45deg); }
+.station.done .dot { background: var(--rail); color: var(--paper); }
+.station.gate.done .dot { background: var(--go); border-color: var(--go); }
+.station[aria-current=step] { color: var(--ink); }
+.station[aria-current=step] .dot { background: var(--stop); border-color: var(--stop); color: #fff; }
+.station.gate[aria-current=step] .dot { animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { background: var(--paper); color: var(--stop); } }
+@media (max-width: 720px) {
+  .rail { grid-template-columns: repeat(4, 1fr); row-gap: 20px; }
+  .rail::before, .rail .progress { display: none; }
+}
+.panel { display: grid; grid-template-columns: 1fr 1.15fr; border: 2px solid var(--rail); background: var(--card); min-height: 300px; }
+@media (max-width: 860px) { .panel { grid-template-columns: 1fr; } }
+.panel .info { padding: 28px; border-right: 2px solid var(--rail); }
+@media (max-width: 860px) { .panel .info { border-right: 0; border-bottom: 2px solid var(--rail); } }
+.who { display: inline-block; font: 500 11px var(--mono); letter-spacing: .12em; padding: 4px 8px; border: 1.5px solid currentColor; text-transform: uppercase; margin-bottom: 14px; }
+.who.you { color: var(--stop); }
+.who.agent { color: var(--go); }
+.panel h3 { font-size: 40px; margin-bottom: 12px; }
+.panel p { margin: 0; color: var(--sub); }
+.panel .files { margin-top: 18px; font: 13px/1.7 var(--mono); color: var(--sub); }
+.term { background: #151412; color: #e9e6dd; padding: 0; display: flex; flex-direction: column; }
+.term .bar { display: flex; gap: 6px; padding: 12px 14px; border-bottom: 1px solid #2c2a26; }
+.term .bar i { width: 10px; height: 10px; border-radius: 50%; background: #3a3832; }
+.term .bar span { margin-left: auto; font: 11px var(--mono); color: #8d897f; }
+.term pre { margin: 0; padding: 18px; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; flex: 1; }
+.term .p { color: #ef7a4a; }
+.term .c { color: #8d897f; }
+.term .caret { display: inline-block; width: 8px; height: 1.1em; background: #e9e6dd; vertical-align: -2px; animation: caret 1s steps(2) infinite; }
+@keyframes caret { 50% { opacity: 0; } }
+.controls { display: flex; gap: 10px; margin-top: 16px; align-items: center; font: 12px var(--mono); color: var(--sub); }
+.controls button { font: 500 12px var(--mono); padding: 6px 12px; background: var(--card); border: 1px solid var(--line); color: var(--ink); cursor: pointer; }
+.controls button:hover { border-color: var(--ink); }
+
+/* anatomy */
+.anatomy { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 48px; align-items: start; }
+@media (max-width: 860px) { .anatomy { grid-template-columns: 1fr; } }
+.tree { background: var(--card); border: 2px solid var(--rail); padding: 20px; font: 13.5px/1.8 var(--mono); white-space: pre; overflow-x: auto; margin: 0; }
+.tree b { color: var(--stop); font-weight: 500; }
+.tree em { color: var(--sub); font-style: normal; }
+.facts { display: grid; gap: 16px; }
+.fact { border-left: 4px solid var(--rail); padding: 4px 0 4px 16px; }
+.fact h3 { font-size: 22px; margin-bottom: 4px; }
+.fact p { margin: 0; color: var(--sub); }
+.ports { display: grid; grid-template-columns: auto repeat(3, 1fr); border: 2px solid var(--rail); margin-top: 24px; font: 13px var(--mono); background: var(--card); }
+.ports div { padding: 10px 12px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+.ports div:nth-child(4n) { border-right: 0; }
+.ports div:nth-last-child(-n+4) { border-bottom: 0; }
+.ports .h { color: var(--sub); text-transform: uppercase; font-size: 11px; letter-spacing: .08em; }
+.ports .v { color: var(--stop); font-weight: 500; }
+
+/* loop */
+.loop { display: grid; grid-template-columns: 420px 1fr; gap: 48px; align-items: center; margin-top: 40px; }
+@media (max-width: 860px) { .loop { grid-template-columns: 1fr; } .loop svg { max-width: 360px; margin: 0 auto; } }
+.loop svg { width: 100%; height: auto; }
+.loop ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 18px; }
+.loop li { counter-increment: s; display: grid; grid-template-columns: 44px 1fr; gap: 12px; }
+.loop li::before { content: counter(s, decimal-leading-zero); font: 900 32px/1 var(--display); color: var(--stop); }
+.loop li b { display: block; }
+.loop li span { color: var(--sub); font-size: 15px; }
+
+/* docs */
+.tabs { display: flex; flex-wrap: wrap; gap: 0; margin-top: 40px; border-bottom: 2px solid var(--rail); }
+.tabs button { padding: 12px 18px; background: none; border: 0; font: 800 18px var(--display); text-transform: uppercase; letter-spacing: .04em; color: var(--sub); cursor: pointer; }
+.tabs button[aria-selected=true] { background: var(--rail); color: var(--paper); }
+.tabpanel { background: var(--card); border: 2px solid var(--rail); border-top: 0; padding: 20px; }
+.tabpanel[hidden] { display: none; }
+.filter { width: 100%; padding: 10px 12px; font: 14px var(--mono); border: 1px solid var(--line); background: var(--paper); color: var(--ink); margin-bottom: 12px; }
+.filter:focus { outline: 2px solid var(--stop); outline-offset: -1px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th { text-align: left; font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--sub); padding: 8px; border-bottom: 2px solid var(--rail); }
+.tbl td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl td:first-child { font: 500 13px var(--mono); white-space: nowrap; color: var(--stop); }
+@media (max-width: 720px) { .tbl td:first-child { white-space: normal; word-break: break-word; } .tbl, .tbl tbody, .tbl tr, .tbl td { display: block; } .tbl thead { display: none; } .tbl td { border: 0; padding: 4px 0; } .tbl tr { border-bottom: 1px solid var(--line); padding: 10px 0; } }
+.tabpanel pre { margin: 0; font-size: 13.5px; line-height: 1.7; overflow-x: auto; }
+.tabpanel .note { color: var(--sub); font-size: 14px; margin: 14px 0 0; }
+.doclinks { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+
+/* contribute */
+.contrib { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin-top: 48px; border: 2px solid var(--rail); background: var(--card); }
+.contrib > div { padding: 24px; border-right: 1px solid var(--line); }
+.contrib > div:last-child { border-right: 0; }
+@media (max-width: 860px) { .contrib { grid-template-columns: 1fr; } .contrib > div { border-right: 0; border-bottom: 1px solid var(--line); } }
+.contrib h3 { margin-bottom: 12px; }
+.contrib pre { background: var(--paper); border: 1px solid var(--line); padding: 12px; overflow-x: auto; margin: 0 0 12px; font-size: 12.5px; line-height: 1.7; }
+.contrib ul, .contrib ol { margin: 0; padding-left: 20px; color: var(--sub); font-size: 15px; }
+.contrib li { margin-bottom: 6px; }
+.open { margin-top: 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.ticket { border: 2px dashed var(--rail); padding: 18px; position: relative; background: var(--paper); }
+.ticket small { font: 500 11px var(--mono); color: var(--stop); letter-spacing: .1em; text-transform: uppercase; }
+.ticket b { display: block; font: 800 22px/1.05 var(--display); text-transform: uppercase; margin: 6px 0; }
+.ticket p { margin: 0; color: var(--sub); font-size: 14px; }
+.cta { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 12px; }
+
+footer { border-top: 2px solid var(--rail); padding: 32px 0 48px; font: 13px var(--mono); color: var(--sub); }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+:focus-visible { outline: 2px solid var(--stop); outline-offset: 3px; }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="siding home">
+      <svg viewBox="0 0 28 28" aria-hidden="true"><path d="M2 22 H26 M4 22 C10 22 10 8 16 8 H26" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="20" cy="8" r="3" fill="#c2461b"/></svg>
+      siding
+    </a>
+    <ul>
+      <li><a href="#workflow">Workflow</a></li>
+      <li class="hide-sm"><a href="#tracks">Tracks</a></li>
+      <li><a href="#docs">Docs</a></li>
+      <li><a href="#contribute">Contribute</a></li>
+      <li><a href="https://github.com/rans0/siding">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">Workspace manager for coding agents</div>
+        <h1>sid<span>i</span>ng</h1>
+        <p class="tag">One task, one track, across every repo it touches, with any agent.</p>
+      </div>
+      <div>
+        <p class="lede" style="margin:0 0 20px">Each task gets its own track: one git worktree per repo, a shared branch, and a generated <code>AGENTS.md</code>. Main clones stay untouched. The agent stops at two gates, and you decide.</p>
+        <div class="install">
+          <div role="tablist" aria-label="Install method">
+            <button role="tab" aria-selected="true" data-cmd="brew install rans0/tap/siding">brew</button>
+            <button role="tab" aria-selected="false" data-cmd="scoop bucket add rans0 https://github.com/rans0/scoop-bucket && scoop install siding">scoop</button>
+            <button role="tab" aria-selected="false" data-cmd="go install github.com/rans0/siding/cmd/siding@latest">go</button>
+          </div>
+          <div class="cmdline">
+            <pre id="install-cmd"><span class="prompt">$ </span><span>brew install rans0/tap/siding</span></pre>
+            <button class="copy" data-copy="#install-cmd span:last-child">copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <figure class="diagram" aria-label="Diagram: tasks run on side tracks and stop at two gates while the main line keeps moving">
+      <svg id="yard" viewBox="0 0 1000 320" role="img">
+        <defs>
+          <g id="sleepers-main"></g>
+        </defs>
+        <!-- sleepers -->
+        <g stroke="var(--line)" stroke-width="18" fill="none" stroke-dasharray="3 11">
+          <path d="M0 270 H1000"/>
+          <path id="pa" d="M60 270 C140 270 160 110 240 110 L760 110 C840 110 860 270 940 270"/>
+          <path id="pb" d="M140 270 C210 270 230 190 300 190 L700 190 C770 190 790 270 860 270"/>
+        </g>
+        <!-- rails: thick ink stroke with paper stroke on top gives two rails -->
+        <g fill="none">
+          <g stroke="var(--rail)" stroke-width="9">
+            <path d="M0 270 H1000"/>
+            <use href="#pa"/><use href="#pb"/>
+          </g>
+          <g stroke="var(--paper)" stroke-width="5">
+            <path d="M0 270 H1000"/>
+            <use href="#pa"/><use href="#pb"/>
+          </g>
+        </g>
+
+        <!-- labels -->
+        <g font-family="IBM Plex Mono, monospace" font-size="12" fill="var(--sub)">
+          <text x="8" y="300">MAIN LINE · repos/ never edited</text>
+          <text x="250" y="94">tracks/add-promo · backend + web</text>
+          <text x="310" y="214">tracks/fix-crash · backend --hotfix</text>
+        </g>
+
+        <!-- signals: siding A -->
+        <g font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--ink)" text-anchor="middle">
+          <g transform="translate(440 0)">
+            <line x1="0" y1="102" x2="0" y2="52" stroke="var(--rail)" stroke-width="3"/>
+            <rect x="-11" y="30" width="22" height="26" rx="4" fill="var(--rail)"/>
+            <circle cy="43" r="7" fill="#c2461b">
+              <animate attributeName="fill" dur="14s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.40;0.62;1" values="#c2461b;#2f9a52;#c2461b;#c2461b"/>
+            </circle>
+            <text y="22">GATE 1 · PRD</text>
+          </g>
+          <g transform="translate(620 0)">
+            <line x1="0" y1="102" x2="0" y2="52" stroke="var(--rail)" stroke-width="3"/>
+            <rect x="-11" y="30" width="22" height="26" rx="4" fill="var(--rail)"/>
+            <circle cy="43" r="7" fill="#c2461b">
+              <animate attributeName="fill" dur="14s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.75;0.95;1" values="#c2461b;#2f9a52;#c2461b;#c2461b"/>
+            </circle>
+            <text y="22">GATE 2 · DIFF</text>
+          </g>
+          <!-- signals: siding B -->
+          <g transform="translate(450 80)">
+            <line x1="0" y1="102" x2="0" y2="70" stroke="var(--rail)" stroke-width="3"/>
+            <circle cy="64" r="7" fill="#c2461b" stroke="var(--rail)" stroke-width="3">
+              <animate attributeName="fill" dur="11s" begin="-5s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.40;0.62;1" values="#c2461b;#2f9a52;#c2461b;#c2461b"/>
+            </circle>
+          </g>
+          <g transform="translate(610 80)">
+            <line x1="0" y1="102" x2="0" y2="70" stroke="var(--rail)" stroke-width="3"/>
+            <circle cy="64" r="7" fill="#c2461b" stroke="var(--rail)" stroke-width="3">
+              <animate attributeName="fill" dur="11s" begin="-5s" repeatCount="indefinite" calcMode="discrete" keyTimes="0;0.75;0.95;1" values="#c2461b;#2f9a52;#c2461b;#c2461b"/>
+            </circle>
+          </g>
+        </g>
+
+        <!-- trains -->
+        <g font-family="IBM Plex Mono, monospace" font-size="10" font-weight="500" text-anchor="middle">
+          <g>
+            <rect x="-38" y="-10" width="76" height="20" rx="3" fill="var(--stop)"/>
+            <text y="4" fill="#fff">add-promo</text>
+            <animateMotion dur="14s" repeatCount="indefinite" rotate="auto" calcMode="linear"
+              keyPoints="0;0.37;0.37;0.555;0.555;1" keyTimes="0;0.25;0.42;0.6;0.77;1"><mpath href="#pa"/></animateMotion>
+          </g>
+          <g>
+            <rect x="-36" y="-10" width="72" height="20" rx="3" fill="var(--amber)"/>
+            <text y="4" fill="#1b1a17">fix-crash</text>
+            <animateMotion dur="11s" begin="-5s" repeatCount="indefinite" rotate="auto" calcMode="linear"
+              keyPoints="0;0.36;0.36;0.565;0.565;1" keyTimes="0;0.25;0.42;0.6;0.77;1"><mpath href="#pb"/></animateMotion>
+          </g>
+          <g>
+            <rect x="-30" y="-10" width="60" height="20" rx="3" fill="var(--rail)"/>
+            <text y="4" fill="var(--paper)">main</text>
+            <animateMotion dur="5s" repeatCount="indefinite" path="M-60 270 H1060"/>
+          </g>
+        </g>
+      </svg>
+      <figcaption class="legend">
+        <span><i style="background:#c2461b"></i>signal red: agent stopped, waiting for you</span>
+        <span><i style="background:#2f9a52"></i>green: <code>siding approve</code></span>
+        <span><i style="background:var(--rail)"></i>main line never blocked</span>
+      </figcaption>
+    </figure>
+
+    <div class="principles reveal">
+      <div><b>CLI is the core</b><p>Any agent that runs shell commands can use it. Adapters only add conveniences.</p></div>
+      <div><b>Plain files</b><p>TOML config. Markdown docs and knowledge. JSON track state. No database, no daemon.</p></div>
+      <div><b>Git only</b><p>The single hard dependency. <code>gh</code>, node and agents are optional.</p></div>
+      <div><b>Two human gates</b><p>Agent stops after the PRD, and again with the uncommitted diff.</p></div>
+    </div>
+  </div>
+</header>
+
+<section id="workflow">
+  <div class="wrap">
+    <div class="eyebrow">Workflow</div>
+    <h2>A task, start to finish</h2>
+    <p class="lede">Stages run <code>prd</code> → <code>GATE 1</code> → <code>build</code> → <code>GATE 2</code> → <code>ship</code>. The agent runs <code>siding submit</code> and stops. Only you run <code>siding approve</code>; in Claude Code, Codex, Cursor and OpenCode a hook enforces it.</p>
+
+    <div class="rail" role="tablist" aria-label="Workflow steps">
+      <div class="progress"></div>
+    </div>
+
+    <div class="panel" id="panel">
+      <div class="info">
+        <span class="who" id="p-who"></span>
+        <h3 id="p-title"></h3>
+        <p id="p-text"></p>
+        <div class="files" id="p-files"></div>
+      </div>
+      <div class="term" aria-label="Terminal">
+        <div class="bar"><i></i><i></i><i></i><span>~/work</span></div>
+        <pre id="p-term"></pre>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="prev" aria-label="Previous step">← prev</button>
+      <button id="play" aria-pressed="true">pause</button>
+      <button id="next" aria-label="Next step">next →</button>
+      <span id="p-count"></span>
+    </div>
+  </div>
+</section>
+
+<section id="tracks">
+  <div class="wrap">
+    <div class="eyebrow">Anatomy of a track</div>
+    <h2>Parallel work, no stash</h2>
+    <p class="lede">Every task is a folder with one worktree per repo and the same branch name in each. Several tracks run at once, each in its own terminal, on its own ports.</p>
+    <div class="anatomy">
+<pre class="tree reveal">~/work/
+├── siding.toml          <em># workspace config</em>
+├── repos/               <em># main clones, never edited</em>
+│   ├── backend/
+│   └── web/
+├── <b>tracks/add-promo/</b>
+│   ├── AGENTS.md        <em># rules, repos, skills for this stage</em>
+│   ├── .track.json      <em># stage + base commit</em>
+│   ├── <b>backend/</b>         <em># worktree · rans/add-promo</em>
+│   └── <b>web/</b>             <em># worktree · rans/add-promo</em>
+├── docs/2026-10-18_add-promo/
+│   └── prd.md plan.md testing.md log.md
+└── knowledge/
+    ├── rules/  skills/  repos/
+    └── inbox/           <em># lesson proposals</em></pre>
+      <div class="facts reveal">
+        <div class="fact"><h3>Main clones untouched</h3><p>Worktrees branch off <code>repos/</code>. A hook blocks edits there. No <code>git checkout</code> between tasks.</p></div>
+        <div class="fact"><h3>Generated AGENTS.md</h3><p>Rules, worktree paths, branches, repo facts and the skills for the current stage. Regenerated when the stage changes.</p></div>
+        <div class="fact"><h3>Safe by default</h3><p>Existing branches are reused. <code>done</code> checks everything first and refuses on uncommitted or unpushed work.</p></div>
+        <div class="fact"><h3>A port slot per track</h3><p>Each worktree gets a <code>.env</code> with <code>env_ports</code> shifted by <code>slot × port_stride</code> and its own <code>COMPOSE_PROJECT_NAME</code>.</p>
+          <div class="ports" aria-label="Port example with port_stride 100">
+            <div class="h">slot</div><div class="h">0</div><div class="h">1</div><div class="h">2</div>
+            <div class="h">web</div><div class="v">3000</div><div class="v">3100</div><div class="v">3200</div>
+            <div class="h">backend</div><div class="v">8080</div><div class="v">8180</div><div class="v">8280</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="learn">
+  <div class="wrap">
+    <div class="eyebrow">Learning loop</div>
+    <h2>Every task teaches the next</h2>
+    <div class="loop">
+      <svg viewBox="0 0 400 400" role="img" aria-label="Loop: retro writes proposals to inbox, you review with siding learn, facts go to knowledge, knowledge goes into the next AGENTS.md">
+        <circle id="ring" cx="200" cy="200" r="140" fill="none" stroke="var(--rail)" stroke-width="3" stroke-dasharray="4 8"/>
+        <path id="ringpath" d="M200 60 A140 140 0 1 1 199.9 60" fill="none"/>
+        <g font-family="IBM Plex Mono, monospace" font-size="12" text-anchor="middle" fill="var(--ink)">
+          <g transform="translate(200 60)"><rect x="-62" y="-18" width="124" height="36" fill="var(--card)" stroke="var(--rail)" stroke-width="2"/><text y="5">retro · log.md</text></g>
+          <g transform="translate(340 200)"><rect x="-58" y="-18" width="116" height="36" fill="var(--card)" stroke="var(--rail)" stroke-width="2"/><text y="5">inbox/</text></g>
+          <g transform="translate(200 340)"><rect x="-62" y="-18" width="124" height="36" fill="var(--stop)"/><text y="5" fill="#fff">siding learn</text></g>
+          <g transform="translate(60 200)"><rect x="-58" y="-18" width="116" height="36" fill="var(--card)" stroke="var(--rail)" stroke-width="2"/><text y="5">AGENTS.md</text></g>
+        </g>
+        <circle r="8" fill="var(--stop)"><animateMotion dur="8s" repeatCount="indefinite"><mpath href="#ringpath"/></animateMotion></circle>
+        <text x="200" y="196" text-anchor="middle" font-family="Big Shoulders Display, sans-serif" font-weight="900" font-size="44" fill="var(--ink)">KNOW</text>
+        <text x="200" y="236" text-anchor="middle" font-family="Big Shoulders Display, sans-serif" font-weight="900" font-size="44" fill="var(--stop)">LEDGE</text>
+      </svg>
+      <ol class="reveal">
+        <li><div><b>Retro</b><span>Before <code>done</code>, the agent writes up to <code>retro_max</code> lesson proposals to <code>knowledge/inbox/</code>, one Markdown file each.</span></div></li>
+        <li><div><b>Review</b><span><code>siding learn</code> or the board's Inbox: accept, edit, skip or delete, one at a time.</span></div></li>
+        <li><div><b>Store</b><span>Accepted facts land in <code>knowledge/repos/&lt;repo&gt;.md</code> with a verified commit marker. <code>skill:</code> and <code>rule:</code> proposals become skills or rules.</span></div></li>
+        <li><div><b>Reuse</b><span>Every later track touching that repo gets the facts in its <code>AGENTS.md</code>. <code>siding doctor</code> flags facts whose paths no longer exist.</span></div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="docs">
+  <div class="wrap">
+    <div class="eyebrow">Documentation</div>
+    <h2>Read the manual</h2>
+    <p class="lede">Quick reference below. The full README covers adopting an existing workspace, epics with <code>siding next</code>, hotfixes and deep reviews.</p>
+
+    <div class="tabs" role="tablist" aria-label="Documentation">
+      <button role="tab" aria-selected="true" aria-controls="t-quick" id="tab-quick">Quick start</button>
+      <button role="tab" aria-selected="false" aria-controls="t-cmds" id="tab-cmds">Commands</button>
+      <button role="tab" aria-selected="false" aria-controls="t-config" id="tab-config">Config</button>
+      <button role="tab" aria-selected="false" aria-controls="t-harness" id="tab-harness">Harnesses</button>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="t-quick" aria-labelledby="tab-quick">
+<pre><span class="prompt">$ </span>siding init ~/work && cd ~/work
+<span class="prompt">$ </span>siding repo add git@github.com:acme/backend.git
+<span class="prompt">$ </span>siding repo add git@github.com:acme/web.git
+<span class="prompt">$ </span>siding adapter install claude      <span class="cmt"># or: codex, cursor, opencode, agents</span>
+
+<span class="prompt">$ </span>siding new add-promo backend,web   <span class="cmt"># tracks/add-promo/{backend,web}</span>
+<span class="prompt">$ </span>siding open add-promo              <span class="cmt"># agent in this terminal, also live on the board</span>
+<span class="prompt">$ </span>siding ui                          <span class="cmt"># board at http://127.0.0.1:4747</span>
+<span class="prompt">$ </span>siding approve add-promo           <span class="cmt"># you pass Gate 1, later Gate 2</span>
+<span class="prompt">$ </span>siding pr add-promo                <span class="cmt"># commit, push, one PR per repo</span>
+<span class="prompt">$ </span>siding done add-promo              <span class="cmt"># after log.md is written</span></pre>
+      <p class="note">Something looks wrong? Run <code>siding doctor</code>.</p>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="t-cmds" aria-labelledby="tab-cmds" hidden>
+      <input class="filter" id="filter" type="search" placeholder="Filter commands… (try: gate, pr, repo)" aria-label="Filter commands">
+      <table class="tbl"><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody id="cmds"></tbody></table>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="t-config" aria-labelledby="tab-config" hidden>
+<pre><span class="cmt"># siding.toml</span>
+[defaults]
+base = "origin/main"
+retro_max = 5
+port_stride = 100
+
+[repos.backend]
+base = "origin/develop"        <span class="cmt"># optional, overrides defaults.base</span>
+setup = "go mod download"      <span class="cmt"># runs in each new worktree</span>
+env_ports = ["PORT=8080", "DB_PORT=5432"]
+
+<span class="cmt"># .siding.local.toml (per machine, gitignored)</span>
+branch_prefix = "rans"         <span class="cmt"># branches become rans/&lt;task&gt;</span>
+ref_only = ["docs-site"]
+agent = "claude"               <span class="cmt"># what `siding open` starts</span></pre>
+      <p class="note">Required tools and skills are pinned under <code>[required.*]</code> and fetched by <code>siding adapter install</code>. <code>siding new</code> refuses while any is missing.</p>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="t-harness" aria-labelledby="tab-harness" hidden>
+      <table class="tbl"><thead><tr><th>Harness</th><th>Support</th></tr></thead><tbody>
+        <tr><td>Claude Code</td><td><code>CLAUDE.md</code>, <code>/siding</code> slash command, hook blocking edits in <code>repos/</code>, ponytail plugin inside tracks only</td></tr>
+        <tr><td>Codex</td><td><code>.agents/skills/siding</code> skill, <code>.codex/hooks.json</code> guard</td></tr>
+        <tr><td>Cursor</td><td><code>/siding</code> command, <code>.agents/skills/siding</code> skill, <code>.cursor/hooks.json</code> guard</td></tr>
+        <tr><td>OpenCode</td><td><code>/siding</code> command, <code>.opencode/plugins/siding-guard.js</code> guard</td></tr>
+        <tr><td>Any other agent</td><td>Instruction-only through <code>AGENTS.md</code> (<code>siding adapter install agents</code>)</td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="doclinks">
+      <a class="btn" href="https://github.com/rans0/siding#readme">Full README</a>
+      <a class="btn ghost" href="https://github.com/rans0/siding/releases">Releases</a>
+    </div>
+  </div>
+</section>
+
+<section id="contribute">
+  <div class="wrap">
+    <div class="eyebrow">Open to contribute</div>
+    <h2>Lay some track with us</h2>
+    <p class="lede">siding is MIT licensed and small on purpose: Go stdlib first, plain files, git as the only hard dependency. Issues and PRs welcome.</p>
+
+    <div class="contrib reveal">
+      <div>
+        <h3>01 · Setup</h3>
+<pre>git clone https://github.com/rans0/siding
+cd siding
+go build ./cmd/siding
+go vet ./... && go test ./...
+siding init /tmp/ws   <span class="cmt"># scratch workspace</span></pre>
+        <ul>
+          <li>Tests use real git repos in <code>t.TempDir()</code>, no network.</li>
+          <li>CI runs Linux, macOS and Windows.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>02 · Where code goes</h3>
+        <ul>
+          <li><code>cmd/siding</code>: flag parsing and output only</li>
+          <li><code>internal/core</code>: everything else, shared by CLI and board</li>
+          <li><code>internal/ui</code>: board handlers, terminal websocket</li>
+          <li><code>web/</code>: board templates and CSS</li>
+          <li><code>templates/</code>, <code>starter-knowledge/</code>: embedded into the binary</li>
+        </ul>
+      </div>
+      <div>
+        <h3>03 · House rules</h3>
+        <ol>
+          <li>One change per commit, imperative message.</li>
+          <li>A test for each behavior you change.</li>
+          <li>Paths via <code>filepath.Join</code>, JSON via <code>json.Marshal</code>.</li>
+          <li>Update the README when a command or flag changes.</li>
+          <li>New Go module? Needs a reason a few lines can't cover.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="open">
+      <div class="ticket reveal"><small>Roadmap</small><b>Sessions that outlive the terminal</b><p>Keep the agent PTY alive after the starting terminal closes.</p></div>
+      <div class="ticket reveal"><small>Roadmap · Windows</small><b>Live board terminal via ConPTY</b><p>Today the board shows no terminal on Windows.</p></div>
+      <div class="ticket reveal"><small>Adapter</small><b>Bring your harness</b><p>Add an entry to <code>adapters</code>, handle its hook in <code>Guard</code>, cover it in <code>TestGuardPayloads</code> and <code>TestAdapterFiles</code>.</p></div>
+    </div>
+
+    <div class="cta">
+      <a class="btn" href="https://github.com/rans0/siding/blob/main/CONTRIBUTING.md">Read CONTRIBUTING.md</a>
+      <a class="btn ghost" href="https://github.com/rans0/siding/issues">Browse issues</a>
+      <a class="btn ghost" href="https://github.com/rans0/siding/fork">Fork the repo</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>siding · MIT License · © 2026 rans0</span>
+    <span>A side track where a train works without blocking the main line.</span>
+  </div>
+</footer>
+
+<script>
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (reduce) document.querySelectorAll("svg").forEach(s => s.pauseAnimations && s.pauseAnimations());
+
+// copy buttons
+document.querySelectorAll(".copy").forEach(b => b.addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(document.querySelector(b.dataset.copy).textContent); b.textContent = "copied"; }
+  catch { b.textContent = "select + copy"; }
+  setTimeout(() => b.textContent = "copy", 1500);
+}));
+
+// tabs (install + docs)
+function tabs(list, onSelect) {
+  const ts = [...list.querySelectorAll("[role=tab]")];
+  ts.forEach((t, i) => {
+    t.addEventListener("click", () => select(t));
+    t.addEventListener("keydown", e => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (d) { const n = ts[(i + d + ts.length) % ts.length]; n.focus(); select(n); }
+    });
+  });
+  function select(t) { ts.forEach(x => { x.setAttribute("aria-selected", x === t); x.tabIndex = x === t ? 0 : -1; }); onSelect(t); }
+  select(ts.find(t => t.getAttribute("aria-selected") === "true"));
+}
+tabs(document.querySelector(".install [role=tablist]"), t => document.querySelector("#install-cmd span:last-child").textContent = t.dataset.cmd);
+tabs(document.querySelector(".tabs"), t => document.querySelectorAll(".tabpanel").forEach(p => p.hidden = p.id !== t.getAttribute("aria-controls")));
+
+// workflow
+const steps = [
+  { s: "1", t: "Start", who: "you", text: "Create a track: one worktree per repo on a shared branch, setup commands run, AGENTS.md written. Then start the agent inside it.",
+    files: "tracks/add-promo/{backend,web}<br>tracks/add-promo/AGENTS.md",
+    term: ["$ siding new add-promo backend,web", "# worktrees on rans/add-promo, base recorded in .track.json", "$ siding open add-promo", "# agent starts here, also live on the board"] },
+  { s: "2", t: "PRD", who: "agent", text: "The agent reads AGENTS.md, loads the prd skill and writes the product requirements. Then it submits and stops.",
+    files: "docs/2026-10-18_add-promo/prd.md",
+    term: ["# agent writes prd.md", "$ siding submit add-promo", "# stage: prd → GATE 1. agent stops."] },
+  { s: "G1", gate: 1, t: "Gate 1", who: "you", text: "Read the PRD on the board or in your editor. Approve to continue, or send it back and tell the agent what to change.",
+    files: "board: http://127.0.0.1:4747",
+    term: ["$ siding approve add-promo", "# GATE 1 → build", "", "$ siding approve add-promo --back", "# or: back to prd, with your notes"] },
+  { s: "3", t: "Build", who: "agent", text: "The agent plans, writes tests and code in the worktrees, and leaves every change uncommitted for you to review.",
+    files: "plan.md · testing.md<br>tracks/add-promo/backend/…<br>tracks/add-promo/web/…",
+    term: ["# agent: plan → tests → code", "$ siding submit add-promo", "# stage: build → GATE 2. agent stops."] },
+  { s: "G2", gate: 1, t: "Gate 2", who: "you", text: "Review the diff on the board, file by file, uncommitted vs committed. Or get the base, commits and diffstat per repo in the terminal.",
+    files: "board: per-file diff, commits, docs, live terminal",
+    term: ["$ siding report add-promo", "# base, commits since base, diffstat per repo", "$ siding approve add-promo", "# GATE 2 → ship"] },
+  { s: "4", t: "Ship", who: "you", text: "siding commits, pushes and opens one PR per repo with gh. Title and body come from prd.md. --push-only skips gh.",
+    files: "one PR per repo",
+    term: ["$ siding pr add-promo", "# commit + push + gh pr create, per repo"] },
+  { s: "5", t: "Retro", who: "agent", text: "The agent writes log.md and lesson proposals into knowledge/inbox/. You review them with siding learn or on the board's Inbox.",
+    files: "docs/…/log.md<br>knowledge/inbox/*.md",
+    term: ["# agent writes log.md + proposals", "$ siding learn", "[1/2] backend: integration tests need `scripts/db-up.sh` first", "      (a)ccept  (e)dit  (s)kip  (d)elete >"] },
+  { s: "6", t: "Done", who: "you", text: "After the PRs merge, remove the worktrees. Task docs stay. For an epic, siding next starts the next cycle on the same branch instead.",
+    files: "docs/2026-10-18_add-promo/ survives",
+    term: ["$ siding done add-promo", "# refuses if log.md missing or work unpushed", "# worktrees removed, docs kept"] },
+];
+const rail = document.querySelector(".rail"), prog = rail.querySelector(".progress");
+const stations = steps.map((st, i) => {
+  const b = document.createElement("button");
+  b.className = "station" + (st.gate ? " gate" : "");
+  b.setAttribute("role", "tab");
+  b.innerHTML = `<span class="dot"><span>${st.s}</span></span>${st.t}`;
+  b.addEventListener("click", () => { stop(); show(i); });
+  rail.appendChild(b);
+  return b;
+});
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+let cur = 0, timer = null, typing = null;
+function show(i) {
+  cur = (i + steps.length) % steps.length;
+  const st = steps[cur];
+  stations.forEach((b, j) => {
+    b.classList.toggle("done", j < cur);
+    j === cur ? b.setAttribute("aria-current", "step") : b.removeAttribute("aria-current");
+    b.setAttribute("aria-selected", j === cur);
+  });
+  prog.style.width = `${(cur / (steps.length - 1)) * 88}%`;
+  $("p-who").className = "who " + st.who;
+  $("p-who").textContent = st.who === "you" ? "You act" : "Agent acts";
+  $("p-title").textContent = st.t;
+  $("p-text").textContent = st.text;
+  $("p-files").innerHTML = st.files;
+  $("p-count").textContent = `step ${cur + 1} / ${steps.length}`;
+  type(st.term);
+}
+function line(l) {
+  if (l.startsWith("$ ")) return `<span class="p">$ </span>${esc(l.slice(2))}`;
+  if (l.startsWith("#")) return `<span class="c">${esc(l)}</span>`;
+  return esc(l);
+}
+function type(lines) {
+  clearTimeout(typing);
+  const out = $("p-term");
+  if (reduce) { out.innerHTML = lines.map(line).join("\n"); return; }
+  let n = 0;
+  (function tick() {
+    out.innerHTML = lines.slice(0, n).map(line).join("\n") + (n < lines.length ? (n ? "\n" : "") + '<span class="caret"></span>' : "");
+    if (n++ < lines.length) typing = setTimeout(tick, 420);
+  })();
+}
+function play() { clearInterval(timer); timer = setInterval(() => show(cur + 1), 4800); $("play").textContent = "pause"; $("play").setAttribute("aria-pressed", "true"); }
+function stop() { clearInterval(timer); timer = null; $("play").textContent = "play"; $("play").setAttribute("aria-pressed", "false"); }
+$("play").addEventListener("click", () => timer ? stop() : play());
+$("prev").addEventListener("click", () => { stop(); show(cur - 1); });
+$("next").addEventListener("click", () => { stop(); show(cur + 1); });
+show(0);
+if (!reduce) {
+  // autoplay only while the workflow is on screen
+  new IntersectionObserver(([e]) => e.isIntersecting ? (timer || $("play").getAttribute("aria-pressed") === "true") && play() : clearInterval(timer), { threshold: .3 }).observe($("panel"));
+} else stop();
+
+// commands
+const cmds = [
+  ["siding init [dir]", "Create a workspace"],
+  ["siding repo add <url|dir> [--ref-only]", "Clone into repos/ (a local clone is copied with its branches); --ref-only repos can't be used in tracks"],
+  ["siding adopt <old-workspace>", "Copy every clone in an old workspace into repos/; the old one is untouched"],
+  ["siding repo ls", "Repos and the tracks using each"],
+  ["siding new <task> <repo,repo> [--from] [--hotfix] [--branch] [--docs]", "Create a track: worktrees, setup commands, AGENTS.md"],
+  ["siding ls", "All tracks with stage, uncommitted files and ahead/behind counts"],
+  ["siding submit <task>", "Agent: move the track to its next gate (Gate 1 needs prd.md)"],
+  ["siding approve <task> [--back]", "You: pass the gate, or send the track back a stage"],
+  ["siding open <task> [--agent cmd]", "Start the agent in the track in any terminal; attach if already running"],
+  ["siding report <task>", "Base, commits since base and diffstat per repo"],
+  ["siding pr <task> [--push-only]", "After Gate 2: commit, push and open a PR per repo with gh; title and body from prd.md"],
+  ["siding next <task>", "After the PR merges: start the next cycle on the same branches"],
+  ["siding ui [--port N]", "Board on 127.0.0.1:4747: tracks by stage, per-file diffs, commits, docs, live terminal, gate buttons, Inbox, Health"],
+  ["siding review <task>", "Deep-review a finished task on the latest base: report first, then fix through the gates"],
+  ["siding done <task> [--force]", "Remove the track's worktrees once log.md exists; task docs are kept"],
+  ["siding adapter install <agents|claude|codex|cursor|opencode>", "Set up required tools and skills, write harness files into tracks"],
+  ["siding learn", "Review knowledge/inbox/ one proposal at a time: accept, edit, skip or delete"],
+  ["siding doctor", "Check tools, skills, plugins, config, missing or orphaned worktrees, stale facts"],
+  ["siding completion zsh|bash", "Tab completion with descriptions: commands, tasks with stage, repos, flags"],
+  ["siding version", "Print the version"],
+];
+const tbody = $("cmds");
+tbody.innerHTML = cmds.map(([c, d]) => `<tr><td>${esc(c)}</td><td>${esc(d)}</td></tr>`).join("");
+$("filter").addEventListener("input", e => {
+  const q = e.target.value.toLowerCase();
+  [...tbody.rows].forEach(r => r.hidden = q && !r.textContent.toLowerCase().includes(q));
+});
+
+// reveal on scroll
+const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && (e.target.classList.add("in"), io.unobserve(e.target))), { threshold: .15 });
+document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+</script>
+</body>
+</html>
