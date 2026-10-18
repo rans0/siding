@@ -50,8 +50,8 @@ var columnOf = map[string]int{
 type diffLine struct{ Class, Text string }
 
 type repoReport struct {
-	R    core.RepoReport
-	Diff []diffLine
+	R                      core.RepoReport
+	Uncommitted, Committed []diffLine
 }
 
 type doc struct{ Name, Body string }
@@ -98,8 +98,8 @@ func Handler(w *core.Workspace) http.Handler {
 		}
 		var reports []repoReport
 		for _, rep := range w.Report(t) {
-			d, _ := w.Diff(t, rep.Name)
-			reports = append(reports, repoReport{rep, classify(d)})
+			c, _ := w.Changes(t, rep.Name)
+			reports = append(reports, repoReport{rep, classify(c.Uncommitted), classify(c.Committed)})
 		}
 		var docs []doc
 		for _, name := range []string{"review.md", "prd.md", "plan.md", "testing.md", "log.md"} {

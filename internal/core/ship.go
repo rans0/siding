@@ -38,23 +38,50 @@ func (w *Workspace) Report(t *Track) []RepoReport {
 	return out
 }
 
-// Diff returns the full diff of a repo in a track against its base commit, untracked files listed after.
-func (w *Workspace) Diff(t *Track, repo string) (string, error) {
+// Changes of one repo in a track, split for review.
+type Changes struct {
+	Committed   string // base commit to HEAD
+	Uncommitted string // HEAD to working tree, untracked files as new-file diffs
+}
+
+// Untracked files past these limits are listed by name only: a stray build dir must not stall the board.
+const (
+	maxUntrackedDiffs = 50
+	maxUntrackedBytes = 256 << 10
+)
+
+// Changes returns a repo's committed and uncommitted diffs against the track's base commit.
+func (w *Workspace) Changes(t *Track, repo string) (Changes, error) {
 	for _, r := range t.Repos {
 		if r.Name != repo {
 			continue
 		}
 		dir := filepath.Join(w.trackDir(t.Task), r.Name)
-		d, err := git(dir, "diff", r.BaseCommit)
-		if err != nil {
-			return "", err
+		var c Changes
+		var err error
+		if c.Committed, err = git(dir, "diff", r.BaseCommit, "HEAD"); err != nil {
+			return c, err
 		}
-		if u, _ := git(dir, "ls-files", "--others", "--exclude-standard"); u != "" {
-			d += "\n\n# untracked files (not in diff):\n" + u
+		if c.Uncommitted, err = git(dir, "diff", "HEAD"); err != nil {
+			return c, err
 		}
-		return d, nil
+		u, _ := git(dir, "ls-files", "--others", "--exclude-standard")
+		var names []string
+		for i, f := range lines(u) {
+			if fi, err := os.Stat(filepath.Join(dir, f)); i >= maxUntrackedDiffs || err != nil || fi.Size() > maxUntrackedBytes {
+				names = append(names, f)
+				continue
+			}
+			// --no-index exits 1 when files differ, which is always here: the output is the result.
+			d, _ := exec.Command("git", "-C", dir, "diff", "--no-index", "--", os.DevNull, f).Output()
+			c.Uncommitted = strings.TrimSpace(c.Uncommitted + "\n" + strings.TrimSpace(string(d)))
+		}
+		if names != nil {
+			c.Uncommitted += "\n\n# untracked, too many or too big to show:\n" + strings.Join(names, "\n")
+		}
+		return c, nil
 	}
-	return "", fmt.Errorf("track %s has no repo %s", t.Task, repo)
+	return Changes{}, fmt.Errorf("track %s has no repo %s", t.Task, repo)
 }
 
 func lines(s string) []string {

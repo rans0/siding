@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"html"
+	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -89,5 +92,64 @@ func TestInboxAndHealth(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "http://127.0.0.1/health", nil))
 	if rec.Code != 200 {
 		t.Fatalf("health code %d", rec.Code)
+	}
+}
+
+// gitTrack makes workspace ws with track "feat" whose repo "app" has one commit past base,
+// then leaves an uncommitted edit. It returns the handler and the commit's sha.
+func gitTrack(t *testing.T) (http.Handler, string) {
+	t.Helper()
+	for _, k := range []string{"GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
+		t.Setenv(k, "t")
+	}
+	ws := t.TempDir()
+	wt := filepath.Join(ws, "tracks/feat/app")
+	os.MkdirAll(wt, 0o755)
+	git := func(args ...string) string {
+		out, err := exec.Command("git", append([]string{"-C", wt}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %s", args, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-q")
+	os.WriteFile(filepath.Join(wt, "a.txt"), []byte("a\n"), 0o644)
+	git("add", ".")
+	git("commit", "-qm", "init")
+	base := git("rev-parse", "HEAD")
+	os.WriteFile(filepath.Join(wt, "a.txt"), []byte("committed\n"), 0o644)
+	git("commit", "-qam", "add feature")
+	sha := git("rev-parse", "HEAD")
+	os.WriteFile(filepath.Join(wt, "a.txt"), []byte("committed\nwip\n"), 0o644)
+
+	os.WriteFile(filepath.Join(ws, "siding.toml"), nil, 0o644)
+	os.WriteFile(filepath.Join(ws, "tracks/feat/.track.json"),
+		[]byte(`{"task":"feat","status":"gate2","repos":[{"name":"app","branch":"b","base":"main","base_commit":"`+base+`"}]}`), 0o644)
+	w, err := core.Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Handler(w), sha
+}
+
+func serve(h http.Handler, path string) (int, string) {
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "http://127.0.0.1"+path, nil))
+	return rec.Code, html.UnescapeString(rec.Body.String())
+}
+
+// The track page splits uncommitted from committed work.
+func TestTrackChanges(t *testing.T) {
+	h, _ := gitTrack(t)
+	code, page := serve(h, "/t/feat")
+	u, c := strings.Index(page, "Uncommitted"), strings.Index(page, "Committed")
+	if code != 200 || u < 0 || c < 0 {
+		t.Fatalf("code %d:\n%s", code, page)
+	}
+	if wip := strings.Index(page, "+wip"); wip < u || wip > c {
+		t.Errorf("+wip not under Uncommitted:\n%s", page)
+	}
+	if strings.LastIndex(page, "+committed") < c {
+		t.Errorf("+committed not under Committed:\n%s", page)
 	}
 }
