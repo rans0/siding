@@ -49,8 +49,11 @@ var columnOf = map[string]int{
 
 type diffLine struct{ Class, Text string }
 
+type commit struct{ SHA, Subject string }
+
 type repoReport struct {
 	R                      core.RepoReport
+	Commits                []commit
 	Uncommitted, Committed []diffLine
 }
 
@@ -99,7 +102,12 @@ func Handler(w *core.Workspace) http.Handler {
 		var reports []repoReport
 		for _, rep := range w.Report(t) {
 			c, _ := w.Changes(t, rep.Name)
-			reports = append(reports, repoReport{rep, classify(c.Uncommitted), classify(c.Committed)})
+			var commits []commit
+			for _, l := range rep.Commits {
+				sha, subject, _ := strings.Cut(l, " ")
+				commits = append(commits, commit{sha, subject})
+			}
+			reports = append(reports, repoReport{rep, commits, classify(c.Uncommitted), classify(c.Committed)})
 		}
 		var docs []doc
 		for _, name := range []string{"review.md", "prd.md", "plan.md", "testing.md", "log.md"} {
@@ -112,6 +120,19 @@ func Handler(w *core.Workspace) http.Handler {
 			"Reports": reports, "Docs": docs, "HasTerminal": w.SessionRunning(t.Task),
 			"Error": r.URL.Query().Get("error"),
 		})
+	})
+	mux.HandleFunc("GET /t/{task}/{repo}/{sha}", func(rw http.ResponseWriter, r *http.Request) {
+		t, err := w.LoadTrack(r.PathValue("task"))
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusNotFound)
+			return
+		}
+		d, err := w.Show(t, r.PathValue("repo"), r.PathValue("sha"))
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusNotFound)
+			return
+		}
+		render(rw, "commit.html", map[string]any{"T": t, "Repo": r.PathValue("repo"), "SHA": r.PathValue("sha"), "Diff": classify(d)})
 	})
 	mux.HandleFunc("GET /xterm/", func(rw http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(rw, r, siding.Assets, "web"+r.URL.Path)

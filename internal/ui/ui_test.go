@@ -153,3 +153,18 @@ func TestTrackChanges(t *testing.T) {
 		t.Errorf("+committed not under Committed:\n%s", page)
 	}
 }
+
+// Commits are listed and each opens its own diff.
+func TestCommitPage(t *testing.T) {
+	h, sha := gitTrack(t)
+	if _, page := serve(h, "/t/feat"); !strings.Contains(page, `href="/t/feat/app/`+sha[:7]) || !strings.Contains(page, "add feature") {
+		t.Fatalf("commit link missing:\n%s", page)
+	}
+	code, page := serve(h, "/t/feat/app/"+sha)
+	if code != 200 || !strings.Contains(page, "+committed") || strings.Contains(page, "+wip") {
+		t.Fatalf("commit page %d:\n%s", code, page)
+	}
+	if code, _ := serve(h, "/t/feat/app/HEAD"); code != 404 {
+		t.Errorf("non-sha got %d, want 404", code)
+	}
+}

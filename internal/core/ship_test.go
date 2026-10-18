@@ -68,3 +68,21 @@ func TestChanges(t *testing.T) {
 		t.Error("unknown repo accepted")
 	}
 }
+
+// Show returns one commit of the track; anything outside base..HEAD is refused.
+func TestShow(t *testing.T) {
+	w, tr, wt := trackT(t)
+	os.WriteFile(filepath.Join(wt, "a.txt"), []byte("one\n"), 0o644)
+	gitT(t, wt, "commit", "-qam", "first change")
+	sha := gitT(t, wt, "rev-parse", "HEAD")
+
+	d, err := w.Show(tr, "app", sha[:7])
+	if err != nil || !strings.Contains(d, "first change") || !strings.Contains(d, "+one") {
+		t.Fatalf("show: %v\n%s", err, d)
+	}
+	for _, bad := range []string{tr.Repos[0].BaseCommit, "--output=/tmp/x", "HEAD", "zzzzzzz"} {
+		if _, err := w.Show(tr, "app", bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}

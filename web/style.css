@@ -53,3 +53,5 @@ textarea { width: 100%; min-height: 80px; font: 12px/1.45 ui-monospace, monospac
            background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
 .actions { display: flex; gap: 8px; margin-top: 8px; }
 .ok { color: var(--ok); }
+.commits { margin: 0 0 8px; padding-left: 18px; } .commits li { margin: 2px 0; }
+pre.full { max-height: none; }

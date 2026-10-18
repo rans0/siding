@@ -53,6 +53,7 @@
   <details open>
     <summary>{{.R.Name}} · <code>{{.R.Branch}}</code> from <code>{{.R.Base}}</code> · {{len .R.Commits}} commit(s)</summary>
     {{with .R.Err}}<p class="err">{{.}}</p>{{end}}
+    {{if .Commits}}<ul class="commits">{{$repo := .R.Name}}{{range .Commits}}<li><a href="/t/{{$.T.Task}}/{{$repo}}/{{.SHA}}"><code>{{.SHA}}</code></a> {{.Subject}}</li>{{end}}</ul>{{end}}
     {{if .R.DiffStat}}<pre>{{.R.DiffStat}}</pre>{{end}}
     {{if .Uncommitted}}<details open><summary>Uncommitted</summary><pre>{{range .Uncommitted}}<span class="{{.Class}}">{{.Text}}</span>
 {{end}}</pre></details>{{end}}

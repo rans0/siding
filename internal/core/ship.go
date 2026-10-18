@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -82,6 +83,34 @@ func (w *Workspace) Changes(t *Track, repo string) (Changes, error) {
 		return c, nil
 	}
 	return Changes{}, fmt.Errorf("track %s has no repo %s", t.Task, repo)
+}
+
+var hexSHA = regexp.MustCompile(`^[0-9a-f]{4,40}$`)
+
+// Show returns one commit of a repo in a track, message and patch. Only commits in
+// base..HEAD are shown, so the board cannot be used to read other history.
+func (w *Workspace) Show(t *Track, repo, sha string) (string, error) {
+	for _, r := range t.Repos {
+		if r.Name != repo {
+			continue
+		}
+		if !hexSHA.MatchString(sha) {
+			return "", fmt.Errorf("not a commit sha: %q", sha)
+		}
+		dir := filepath.Join(w.trackDir(t.Task), r.Name)
+		full, err := git(dir, "rev-parse", "--verify", "--quiet", sha+"^{commit}")
+		if err != nil || full == r.BaseCommit {
+			return "", fmt.Errorf("no commit %s in track %s/%s", sha, t.Task, repo)
+		}
+		if _, err := git(dir, "merge-base", "--is-ancestor", r.BaseCommit, full); err != nil {
+			return "", fmt.Errorf("no commit %s in track %s/%s", sha, t.Task, repo)
+		}
+		if _, err := git(dir, "merge-base", "--is-ancestor", full, "HEAD"); err != nil {
+			return "", fmt.Errorf("no commit %s in track %s/%s", sha, t.Task, repo)
+		}
+		return git(dir, "show", "--format=fuller", full)
+	}
+	return "", fmt.Errorf("track %s has no repo %s", t.Task, repo)
 }
 
 func lines(s string) []string {
