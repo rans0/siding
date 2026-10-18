@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 	"text/tabwriter"
 
@@ -44,6 +45,15 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
 
 var version = "dev" // set by the release build
 
+// resolveVersion keeps a stamped release version, else uses the module version Go
+// embeds for go install pkg@vX and for builds of a git checkout.
+func resolveVersion(stamped, module string) string {
+	if stamped != "dev" || module == "" || module == "(devel)" {
+		return stamped
+	}
+	return strings.TrimPrefix(module, "v")
+}
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "siding:", err)
@@ -79,7 +89,12 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "version" || args[0] == "--version" {
-		fmt.Println("siding", version)
+		bi, _ := debug.ReadBuildInfo()
+		module := ""
+		if bi != nil {
+			module = bi.Main.Version
+		}
+		fmt.Println("siding", resolveVersion(version, module))
 		return nil
 	}
 	if args[0] == "__complete" && len(args) == 2 {
