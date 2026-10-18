@@ -94,6 +94,8 @@ _siding() {
           else _files -/; fi ;;
     adapter) if (( CURRENT == 3 )); then _values subcommand 'install[tools, skills, harness files]'
              else _siding_list adapters harness; fi ;;
+    open) [[ $words[CURRENT-1] == --agent ]] && _command_names ;;
+    completion) (( CURRENT == 3 )) && _values shell zsh bash ;;
     init|adopt) _files -/ ;;
   esac
 }
@@ -103,17 +105,35 @@ if [[ $zsh_eval_context[-1] == loadautofunc ]]; then _siding "$@"; else compdef 
 
 const bashCompletion = `# siding completion for bash. Add to ~/.bashrc: eval "$(siding completion bash)"
 _siding() {
-  local cur=${COMP_WORDS[COMP_CWORD]} kind=
+  local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD-1]} kind= words=
   if (( COMP_CWORD == 1 )); then kind=commands
+  elif [[ $cur == -* ]]; then case ${COMP_WORDS[1]} in
+    new) words="--from --hotfix --branch --docs" ;;
+    approve) words=--back ;;
+    done) words=--force ;;
+    pr) words=--push-only ;;
+    open) words=--agent ;;
+    ui) words=--port ;;
+    repo) words=--ref-only ;;
+  esac
   else case ${COMP_WORDS[1]} in
-    submit|approve|open|report|pr|next|done) kind=tasks ;;
-    review) kind=finished ;;
-    new) (( COMP_CWORD == 3 )) && kind=repos ;;
-    adapter) (( COMP_CWORD == 3 )) && kind=adapters ;;
-    init|adopt|repo) COMPREPLY=($(compgen -d -- "$cur")); return ;;
+    submit|approve|report|pr|next|done) (( COMP_CWORD == 2 )) && kind=tasks ;;
+    open) if [[ $prev == --agent ]]; then COMPREPLY=($(compgen -c -- "$cur")); return; fi
+          (( COMP_CWORD == 2 )) && kind=tasks ;;
+    review) (( COMP_CWORD == 2 )) && kind=finished ;;
+    new) if [[ $prev == --docs ]]; then COMPREPLY=($(compgen -d -- "$cur")); return; fi
+         if (( COMP_CWORD == 3 )); then # comma list: complete the part after the last comma
+           local done=${cur%${cur##*,}}
+           COMPREPLY=($(compgen -P "$done" -W "$(siding __complete repos 2>/dev/null)" -- "${cur##*,}"))
+           compopt -o nospace 2>/dev/null; return
+         fi ;;
+    adapter) if (( COMP_CWORD == 2 )); then words=install; else kind=adapters; fi ;;
+    repo) if (( COMP_CWORD == 2 )); then words="add ls"; else COMPREPLY=($(compgen -d -- "$cur")); return; fi ;;
+    completion) (( COMP_CWORD == 2 )) && words="zsh bash" ;;
+    init|adopt) COMPREPLY=($(compgen -d -- "$cur")); return ;;
   esac; fi
-  [[ -z $kind ]] && return
-  COMPREPLY=($(compgen -W "$(siding __complete $kind 2>/dev/null | cut -d: -f1)" -- "$cur"))
+  [[ -n $kind ]] && words=$(siding __complete $kind 2>/dev/null | cut -d: -f1)
+  COMPREPLY=($(compgen -W "$words" -- "$cur"))
 }
 complete -F _siding siding
 `
