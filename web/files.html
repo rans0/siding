@@ -1,2 +1,22 @@
-{{define "files"}}{{range .}}{{if .Name}}<details class="file"{{if .Open}} open{{end}}><summary><code>{{.Name}}</code> <span class="add">+{{.Add}}</span> <span class="del">-{{.Del}}</span></summary>{{end}}<pre>{{range .Lines}}<span class="{{.Class}}">{{.Text}}</span>
-{{end}}</pre>{{if .Name}}</details>{{end}}{{end}}{{end}}
+{{/* files: a fileList. Each block fetches its diff from data-src the first time it opens. */}}
+{{define "files"}}{{with .Err}}<p class="err">{{.}}</p>{{end}}{{$l := .}}{{range .Files}}<details class="file" data-src="{{$l.URL .}}"{{if $l.Open .}} open{{end}}>
+<summary><code>{{.Path}}</code> {{if .New}}<span class="add">new</span>{{else if .Binary}}<span class="hunk">binary</span>{{else}}<span class="add">+{{.Add}}</span> <span class="del">-{{.Del}}</span>{{end}}</summary><div class="diff"><p class="empty">Loading…</p></div></details>
+{{end}}{{with .Hidden}}<p class="empty">{{.}} more untracked file(s) not listed.</p>{{end}}{{end}}
+
+{{define "diff"}}<pre>{{range .Lines}}<span class="{{.Class}}">{{.Text}}</span>
+{{end}}</pre>{{if .Cut}}<p class="empty">Cut at 1 MiB. Run <code>git diff</code> in the worktree for the rest.</p>{{end}}{{end}}
+
+{{define "lazydiff"}}<script>
+(() => {
+  const load = (d) => {
+    if (!d.open || d.dataset.loaded) return
+    d.dataset.loaded = 1
+    const body = d.querySelector(".diff")
+    fetch(d.dataset.src).then(async (r) => {
+      if (!r.ok) throw new Error(await r.text())
+      body.innerHTML = await r.text()
+    }).catch((e) => { body.innerHTML = ""; const p = document.createElement("p"); p.className = "err"; p.textContent = e.message; body.append(p); delete d.dataset.loaded })
+  }
+  document.querySelectorAll("details.file").forEach((d) => { d.addEventListener("toggle", () => load(d)); load(d) })
+})()
+</script>{{end}}

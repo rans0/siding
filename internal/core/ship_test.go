@@ -43,46 +43,65 @@ func trackT(t *testing.T) (*Workspace, *Track, string) {
 	return w, tr, filepath.Join(ws, "tracks/feat/app")
 }
 
-// Committed and uncommitted work come apart; untracked files show their content.
-func TestChanges(t *testing.T) {
+// Files lists each scope's files with counts; FileDiff serves one listed file, cut at maxDiffBytes.
+func TestFiles(t *testing.T) {
 	w, tr, wt := trackT(t)
 	os.WriteFile(filepath.Join(wt, "a.txt"), []byte("committed\n"), 0o644)
-	gitT(t, wt, "commit", "-qam", "c1")
+	gitT(t, wt, "commit", "-qam", "first change")
+	sha := gitT(t, wt, "rev-parse", "HEAD")
 	os.WriteFile(filepath.Join(wt, "a.txt"), []byte("committed\nwip\n"), 0o644)
 	os.WriteFile(filepath.Join(wt, "new.txt"), []byte("fresh\n"), 0o644)
 
-	c, err := w.Changes(tr, "app")
-	if err != nil {
-		t.Fatal(err)
+	files, hidden, err := w.Files(tr, "app", ScopeUncommitted)
+	want := []FileChange{{Path: "a.txt", Add: 1}, {Path: "new.txt", New: true}}
+	if err != nil || hidden != 0 || len(files) != 2 || files[0] != want[0] || files[1] != want[1] {
+		t.Fatalf("uncommitted: %+v %d %v", files, hidden, err)
 	}
-	if !strings.Contains(c.Committed, "+committed") || strings.Contains(c.Committed, "wip") {
-		t.Errorf("committed:\n%s", c.Committed)
+	for _, c := range []struct{ scope, path, has, not string }{
+		{ScopeUncommitted, "a.txt", "+wip", "+committed"},
+		{ScopeUncommitted, "new.txt", "+fresh", ""},
+		{ScopeCommitted, "a.txt", "+committed", "wip"},
+		{sha[:7], "a.txt", "+committed", "wip"},
+	} {
+		d, cut, err := w.FileDiff(tr, "app", c.scope, c.path)
+		if err != nil || cut || !strings.Contains(d, c.has) || (c.not != "" && strings.Contains(d, c.not)) {
+			t.Errorf("%s %s: %v cut=%v\n%s", c.scope, c.path, err, cut, d)
+		}
 	}
-	if !strings.Contains(c.Uncommitted, "+wip") || strings.Contains(c.Uncommitted, "+committed") {
-		t.Errorf("uncommitted:\n%s", c.Uncommitted)
+	for _, c := range [][2]string{
+		{ScopeCommitted, "new.txt"}, // not in that scope
+		{ScopeUncommitted, "../../siding.toml"},
+		{tr.Repos[0].BaseCommit, "a.txt"}, // outside base..HEAD
+		{"--output=/tmp/x", "a.txt"},
+	} {
+		if _, _, err := w.FileDiff(tr, "app", c[0], c[1]); err == nil {
+			t.Errorf("%q accepted", c)
+		}
 	}
-	if !strings.Contains(c.Uncommitted, "+++ b/new.txt") || !strings.Contains(c.Uncommitted, "+fresh") {
-		t.Errorf("untracked content missing:\n%s", c.Uncommitted)
-	}
-	os.WriteFile(filepath.Join(wt, "huge.bin"), make([]byte, maxUntrackedBytes+1), 0o644)
-	if c, _ := w.Changes(tr, "app"); len(c.Skipped) != 1 || c.Skipped[0] != "huge.bin" {
-		t.Errorf("skipped = %q", c.Skipped)
-	}
-	if _, err := w.Changes(tr, "nope"); err == nil {
+	if _, _, err := w.Files(tr, "nope", ScopeCommitted); err == nil {
 		t.Error("unknown repo accepted")
+	}
+
+	defer func(b, n int) { maxDiffBytes, maxUntrackedFiles = b, n }(maxDiffBytes, maxUntrackedFiles)
+	maxDiffBytes, maxUntrackedFiles = 64, 1
+	os.WriteFile(filepath.Join(wt, "z.txt"), []byte(strings.Repeat("long line\n", 100)), 0o644)
+	if files, hidden, _ := w.Files(tr, "app", ScopeUncommitted); len(files) != 2 || hidden != 1 {
+		t.Errorf("cap: %+v hidden %d", files, hidden)
+	}
+	if d, cut, _ := w.FileDiff(tr, "app", ScopeUncommitted, "new.txt"); !cut || len(d) > 64 {
+		t.Errorf("not cut: %v %d bytes", cut, len(d))
 	}
 }
 
-// Show returns one commit of the track; anything outside base..HEAD is refused.
+// Show returns the message of a commit in base..HEAD; other commits are refused.
 func TestShow(t *testing.T) {
 	w, tr, wt := trackT(t)
 	os.WriteFile(filepath.Join(wt, "a.txt"), []byte("one\n"), 0o644)
 	gitT(t, wt, "commit", "-qam", "first change")
 	sha := gitT(t, wt, "rev-parse", "HEAD")
 
-	d, err := w.Show(tr, "app", sha[:7])
-	if err != nil || !strings.Contains(d, "first change") || !strings.Contains(d, "+one") {
-		t.Fatalf("show: %v\n%s", err, d)
+	if m, err := w.Show(tr, "app", sha[:7]); err != nil || !strings.Contains(m, "first change") || strings.Contains(m, "+one") {
+		t.Fatalf("show: %v\n%s", err, m)
 	}
 	for _, bad := range []string{tr.Repos[0].BaseCommit, "--output=/tmp/x", "HEAD", "zzzzzzz"} {
 		if _, err := w.Show(tr, "app", bad); err == nil {

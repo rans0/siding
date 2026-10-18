@@ -51,22 +51,34 @@ type diffLine struct{ Class, Text string }
 
 type commit struct{ SHA, Subject string }
 
-// fileDiff is one file of a diff; Name is empty for text before the first file (a commit header).
-type fileDiff struct {
-	Name     string
-	Add, Del int
-	Open     bool
-	Lines    []diffLine
+// Files whose line counts are under this start open; their diffs load as the page opens.
+const maxOpenLines = 400
+
+// fileList is one scope's files; each diff loads from Src when its block opens.
+type fileList struct {
+	Src    string // diff url without path: /t/{task}/{repo}/diff?scope=...
+	Files  []core.FileChange
+	Hidden int
+	Err    error
 }
 
-// Files with more lines than this start folded, so one generated file cannot bury the rest.
-const maxOpenLines = 400
+func (l fileList) Open(f core.FileChange) bool {
+	return !f.New && !f.Binary && f.Add+f.Del <= maxOpenLines
+}
+
+// URL of one file's diff, path query-escaped so names like "a&b" survive.
+func (l fileList) URL(f core.FileChange) string { return l.Src + "&path=" + url.QueryEscape(f.Path) }
+
+func files(w *core.Workspace, t *core.Track, repo, scope string) fileList {
+	l := fileList{Src: "/t/" + t.Task + "/" + repo + "/diff?scope=" + url.QueryEscape(scope)}
+	l.Files, l.Hidden, l.Err = w.Files(t, repo, scope)
+	return l
+}
 
 type repoReport struct {
 	R                      core.RepoReport
 	Commits                []commit
-	Uncommitted, Committed []fileDiff
-	Skipped                []string
+	Uncommitted, Committed fileList
 }
 
 type doc struct{ Name, Body string }
@@ -113,13 +125,13 @@ func Handler(w *core.Workspace) http.Handler {
 		}
 		var reports []repoReport
 		for _, rep := range w.Report(t) {
-			c, _ := w.Changes(t, rep.Name)
 			var commits []commit
 			for _, l := range rep.Commits {
 				sha, subject, _ := strings.Cut(l, " ")
 				commits = append(commits, commit{sha, subject})
 			}
-			reports = append(reports, repoReport{rep, commits, splitFiles(c.Uncommitted), splitFiles(c.Committed), c.Skipped})
+			reports = append(reports, repoReport{rep, commits,
+				files(w, t, rep.Name, core.ScopeUncommitted), files(w, t, rep.Name, core.ScopeCommitted)})
 		}
 		var docs []doc
 		for _, name := range []string{"review.md", "prd.md", "plan.md", "testing.md", "log.md"} {
@@ -139,12 +151,28 @@ func Handler(w *core.Workspace) http.Handler {
 			http.Error(rw, err.Error(), http.StatusNotFound)
 			return
 		}
-		d, err := w.Show(t, r.PathValue("repo"), r.PathValue("sha"))
+		repo, sha := r.PathValue("repo"), r.PathValue("sha")
+		msg, err := w.Show(t, repo, sha)
 		if err != nil {
 			http.Error(rw, err.Error(), http.StatusNotFound)
 			return
 		}
-		render(rw, "commit.html", map[string]any{"T": t, "Repo": r.PathValue("repo"), "SHA": r.PathValue("sha"), "Files": splitFiles(d)})
+		render(rw, "commit.html", map[string]any{"T": t, "Repo": repo, "SHA": sha, "Msg": msg, "Files": files(w, t, repo, sha)})
+	})
+	// One file's diff, fetched by the page when its block opens.
+	mux.HandleFunc("GET /t/{task}/{repo}/diff", func(rw http.ResponseWriter, r *http.Request) {
+		t, err := w.LoadTrack(r.PathValue("task"))
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusNotFound)
+			return
+		}
+		q := r.URL.Query()
+		d, cut, err := w.FileDiff(t, r.PathValue("repo"), q.Get("scope"), q.Get("path"))
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusNotFound)
+			return
+		}
+		render(rw, "diff", map[string]any{"Lines": classify(d), "Cut": cut})
 	})
 	mux.HandleFunc("GET /xterm/", func(rw http.ResponseWriter, r *http.Request) {
 		http.ServeFileFS(rw, r, siding.Assets, "web"+r.URL.Path)
@@ -276,30 +304,6 @@ func classify(diff string) []diffLine {
 			c = "del"
 		}
 		out = append(out, diffLine{c, l})
-	}
-	return out
-}
-
-// splitFiles cuts a git diff at each "diff --git" line and counts added and deleted lines.
-func splitFiles(diff string) []fileDiff {
-	var out []fileDiff
-	for _, l := range classify(diff) {
-		if strings.HasPrefix(l.Text, "diff --git ") || out == nil {
-			f := fileDiff{Open: true}
-			if _, b, ok := strings.Cut(l.Text, " b/"); ok && strings.HasPrefix(l.Text, "diff --git ") {
-				f.Name = b
-			}
-			out = append(out, f)
-		}
-		f := &out[len(out)-1]
-		f.Lines = append(f.Lines, l)
-		switch {
-		case l.Class == "add":
-			f.Add++
-		case l.Class == "del":
-			f.Del++
-		}
-		f.Open = len(f.Lines) <= maxOpenLines
 	}
 	return out
 }

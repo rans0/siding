@@ -121,6 +121,7 @@ func gitTrack(t *testing.T) (http.Handler, string) {
 	git("commit", "-qam", "add feature")
 	sha := git("rev-parse", "HEAD")
 	os.WriteFile(filepath.Join(wt, "a.txt"), []byte("committed\nwip\n"), 0o644)
+	os.WriteFile(filepath.Join(wt, "x & y.txt"), []byte("odd name\n"), 0o644)
 
 	os.WriteFile(filepath.Join(ws, "siding.toml"), nil, 0o644)
 	os.WriteFile(filepath.Join(ws, "tracks/feat/.track.json"),
@@ -138,57 +139,56 @@ func serve(h http.Handler, path string) (int, string) {
 	return rec.Code, html.UnescapeString(rec.Body.String())
 }
 
-// The track page splits uncommitted from committed work.
+// src returns the lazy-load url of the first file block after marker in page.
+func src(t *testing.T, page, marker string) string {
+	t.Helper()
+	i := strings.Index(page, marker)
+	j := strings.Index(page[max(i, 0):], `data-src="`)
+	if i < 0 || j < 0 {
+		t.Fatalf("no %s file block:\n%s", marker, page)
+	}
+	rest := page[i+j+len(`data-src="`):]
+	return rest[:strings.IndexByte(rest, '"')]
+}
+
+// The track page lists uncommitted and committed files; each diff loads on its own.
 func TestTrackChanges(t *testing.T) {
 	h, _ := gitTrack(t)
 	code, page := serve(h, "/t/feat")
-	u, c := strings.Index(page, "Uncommitted"), strings.Index(page, "Committed")
-	if code != 200 || u < 0 || c < 0 {
-		t.Fatalf("code %d:\n%s", code, page)
+	if code != 200 || strings.Contains(page, "+wip") {
+		t.Fatalf("diff should load lazily, code %d:\n%s", code, page)
 	}
-	if wip := strings.Index(page, "+wip"); wip < u || wip > c {
-		t.Errorf("+wip not under Uncommitted:\n%s", page)
+	for marker, want := range map[string]string{">Uncommitted<": "+wip", ">Committed<": "+committed"} {
+		u := src(t, page, marker)
+		if code, frag := serve(h, u); code != 200 || !strings.Contains(frag, want) {
+			t.Errorf("%s %s: %d\n%s", marker, u, code, frag)
+		}
 	}
-	if strings.LastIndex(page, "+committed") < c {
-		t.Errorf("+committed not under Committed:\n%s", page)
+	// the block's data-src is the last one before its name
+	odd := page[:strings.Index(page, "<code>x & y.txt")]
+	odd = odd[strings.LastIndex(odd, `data-src="`)+len(`data-src="`):]
+	if _, frag := serve(h, odd[:strings.IndexByte(odd, '"')]); !strings.Contains(frag, "+odd name") {
+		t.Errorf("odd file name not escaped in url:\n%s", frag)
+	}
+	if code, _ := serve(h, "/t/feat/app/diff?scope=committed&path=nope.txt"); code != 404 {
+		t.Errorf("unlisted path got %d, want 404", code)
 	}
 }
 
-// Commits are listed and each opens its own diff.
+// Commits are listed and each opens a page with its message and files.
 func TestCommitPage(t *testing.T) {
 	h, sha := gitTrack(t)
 	if _, page := serve(h, "/t/feat"); !strings.Contains(page, `href="/t/feat/app/`+sha[:7]) || !strings.Contains(page, "add feature") {
 		t.Fatalf("commit link missing:\n%s", page)
 	}
 	code, page := serve(h, "/t/feat/app/"+sha)
-	if code != 200 || !strings.Contains(page, "add feature") || !strings.Contains(page, "+committed") || strings.Contains(page, "+wip") {
+	if code != 200 || !strings.Contains(page, "add feature") {
 		t.Fatalf("commit page %d:\n%s", code, page)
+	}
+	if _, frag := serve(h, src(t, page, "<section>")); !strings.Contains(frag, "+committed") || strings.Contains(frag, "+wip") {
+		t.Errorf("commit file diff:\n%s", frag)
 	}
 	if code, _ := serve(h, "/t/feat/app/HEAD"); code != 404 {
 		t.Errorf("non-sha got %d, want 404", code)
-	}
-}
-
-// Diffs split into one foldable block per file, with +/- counts; big files start folded.
-func TestSplitFiles(t *testing.T) {
-	big := strings.Repeat("+x\n", maxOpenLines+1)
-	d := "diff --git a/a.go b/a.go\n--- a/a.go\n+++ b/a.go\n@@ -1 +1 @@\n-old\n+new\n" +
-		"diff --git a/big.txt b/big.txt\n--- /dev/null\n+++ b/big.txt\n@@ -0,0 +1 @@\n" + big
-	files := splitFiles(d)
-	if len(files) != 2 {
-		t.Fatalf("got %d files", len(files))
-	}
-	if f := files[0]; f.Name != "a.go" || f.Add != 1 || f.Del != 1 || !f.Open || len(f.Lines) != 6 {
-		t.Errorf("a.go: %+v", f)
-	}
-	if f := files[1]; f.Name != "big.txt" || f.Add != maxOpenLines+1 || f.Open {
-		t.Errorf("big.txt: name %s add %d open %v", f.Name, f.Add, f.Open)
-	}
-	if splitFiles("") != nil {
-		t.Error("empty diff gave files")
-	}
-	// commit header before the first file is kept as its own block
-	if f := splitFiles("commit abc\nAuthor: t\n\n    msg\ndiff --git a/a b/a\n+x"); len(f) != 2 || f[0].Name != "" || f[1].Name != "a" {
-		t.Errorf("header: %+v", f)
 	}
 }

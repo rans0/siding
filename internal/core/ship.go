@@ -1,12 +1,15 @@
 package core
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -39,75 +42,175 @@ func (w *Workspace) Report(t *Track) []RepoReport {
 	return out
 }
 
-// Changes of one repo in a track, split for review.
-type Changes struct {
-	Committed   string   // base commit to HEAD
-	Uncommitted string   // HEAD to working tree, untracked files as new-file diffs
-	Skipped     []string // untracked files too many or too big to diff
-}
-
-// Untracked files past these limits are listed by name only: a stray build dir must not stall the board.
+// Scopes for Files and FileDiff; any other scope is a commit sha in the track.
 const (
-	maxUntrackedDiffs = 50
-	maxUntrackedBytes = 256 << 10
+	ScopeUncommitted = "uncommitted" // HEAD to working tree, untracked files included
+	ScopeCommitted   = "committed"   // base commit to HEAD
 )
 
-// Changes returns a repo's committed and uncommitted diffs against the track's base commit.
-func (w *Workspace) Changes(t *Track, repo string) (Changes, error) {
-	for _, r := range t.Repos {
-		if r.Name != repo {
-			continue
-		}
-		dir := filepath.Join(w.trackDir(t.Task), r.Name)
-		var c Changes
-		var err error
-		if c.Committed, err = git(dir, "diff", r.BaseCommit, "HEAD"); err != nil {
-			return c, err
-		}
-		if c.Uncommitted, err = git(dir, "diff", "HEAD"); err != nil {
-			return c, err
-		}
-		u, _ := git(dir, "ls-files", "--others", "--exclude-standard")
-		for i, f := range lines(u) {
-			if fi, err := os.Stat(filepath.Join(dir, f)); i >= maxUntrackedDiffs || err != nil || fi.Size() > maxUntrackedBytes {
-				c.Skipped = append(c.Skipped, f)
-				continue
-			}
-			// --no-index exits 1 when files differ, which is always here: the output is the result.
-			d, _ := exec.Command("git", "-C", dir, "diff", "--no-index", "--", os.DevNull, f).Output()
-			c.Uncommitted = strings.TrimSpace(c.Uncommitted + "\n" + strings.TrimSpace(string(d)))
-		}
-		return c, nil
-	}
-	return Changes{}, fmt.Errorf("track %s has no repo %s", t.Task, repo)
+// FileChange is one file in a scope. Add and Del are 0 for binary and untracked files.
+type FileChange struct {
+	Path     string
+	Add, Del int
+	New      bool // untracked
+	Binary   bool
 }
+
+// Limits that keep one huge diff or a stray build dir from stalling the board. Vars for tests.
+var (
+	maxDiffBytes      = 1 << 20 // per file diff
+	maxUntrackedFiles = 200
+)
 
 var hexSHA = regexp.MustCompile(`^[0-9a-f]{4,40}$`)
 
-// Show returns one commit of a repo in a track, message and patch. Only commits in
-// base..HEAD are shown, so the board cannot be used to read other history.
-func (w *Workspace) Show(t *Track, repo, sha string) (string, error) {
+// repoDir returns the worktree of repo in t.
+func (w *Workspace) repoDir(t *Track, repo string) (string, TrackRepo, error) {
 	for _, r := range t.Repos {
-		if r.Name != repo {
+		if r.Name == repo {
+			return filepath.Join(w.trackDir(t.Task), r.Name), r, nil
+		}
+	}
+	return "", TrackRepo{}, fmt.Errorf("track %s has no repo %s", t.Task, repo)
+}
+
+// commitIn resolves sha to a full commit in base..HEAD, so the board cannot read other history.
+func commitIn(dir string, r TrackRepo, sha string) (string, error) {
+	bad := fmt.Errorf("no commit %q in this track", sha)
+	if !hexSHA.MatchString(sha) {
+		return "", bad
+	}
+	full, err := git(dir, "rev-parse", "--verify", "--quiet", sha+"^{commit}")
+	if err != nil || full == r.BaseCommit {
+		return "", bad
+	}
+	if _, err := git(dir, "merge-base", "--is-ancestor", r.BaseCommit, full); err != nil {
+		return "", bad
+	}
+	if _, err := git(dir, "merge-base", "--is-ancestor", full, "HEAD"); err != nil {
+		return "", bad
+	}
+	return full, nil
+}
+
+// diffRange returns the git diff arguments for a scope other than uncommitted.
+func diffRange(dir string, r TrackRepo, scope string) ([]string, error) {
+	switch scope {
+	case ScopeUncommitted:
+		return []string{"HEAD"}, nil
+	case ScopeCommitted:
+		return []string{r.BaseCommit, "HEAD"}, nil
+	}
+	full, err := commitIn(dir, r, scope)
+	if err != nil {
+		return nil, err
+	}
+	return []string{full + "^", full}, nil
+}
+
+// Files lists the files changed in a scope with line counts, without their diffs.
+// hidden counts untracked files past maxUntrackedFiles.
+func (w *Workspace) Files(t *Track, repo, scope string) (files []FileChange, hidden int, err error) {
+	dir, r, err := w.repoDir(t, repo)
+	if err != nil {
+		return nil, 0, err
+	}
+	rng, err := diffRange(dir, r, scope)
+	if err != nil {
+		return nil, 0, err
+	}
+	out, err := git(dir, append([]string{"diff", "--numstat", "-z", "--no-renames"}, rng...)...)
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, rec := range strings.Split(out, "\x00") {
+		add, rest, _ := strings.Cut(rec, "\t")
+		del, path, ok := strings.Cut(rest, "\t")
+		if !ok {
 			continue
 		}
-		if !hexSHA.MatchString(sha) {
-			return "", fmt.Errorf("not a commit sha: %q", sha)
-		}
-		dir := filepath.Join(w.trackDir(t.Task), r.Name)
-		full, err := git(dir, "rev-parse", "--verify", "--quiet", sha+"^{commit}")
-		if err != nil || full == r.BaseCommit {
-			return "", fmt.Errorf("no commit %s in track %s/%s", sha, t.Task, repo)
-		}
-		if _, err := git(dir, "merge-base", "--is-ancestor", r.BaseCommit, full); err != nil {
-			return "", fmt.Errorf("no commit %s in track %s/%s", sha, t.Task, repo)
-		}
-		if _, err := git(dir, "merge-base", "--is-ancestor", full, "HEAD"); err != nil {
-			return "", fmt.Errorf("no commit %s in track %s/%s", sha, t.Task, repo)
-		}
-		return git(dir, "show", "--format=fuller", full)
+		f := FileChange{Path: path, Binary: add == "-"}
+		f.Add, _ = strconv.Atoi(add)
+		f.Del, _ = strconv.Atoi(del)
+		files = append(files, f)
 	}
-	return "", fmt.Errorf("track %s has no repo %s", t.Task, repo)
+	if scope != ScopeUncommitted {
+		return files, 0, nil
+	}
+	u, _ := git(dir, "ls-files", "-z", "--others", "--exclude-standard")
+	shown := 0
+	for _, path := range strings.Split(u, "\x00") {
+		switch {
+		case path == "":
+		case shown >= maxUntrackedFiles:
+			hidden++
+		default:
+			shown++
+			files = append(files, FileChange{Path: path, New: true})
+		}
+	}
+	return files, hidden, nil
+}
+
+// FileDiff returns the diff of one file listed by Files, cut at maxDiffBytes (cut reports it).
+// Only listed paths are served, so a request cannot reach files outside the change.
+func (w *Workspace) FileDiff(t *Track, repo, scope, path string) (diff string, cut bool, err error) {
+	files, _, err := w.Files(t, repo, scope)
+	if err != nil {
+		return "", false, err
+	}
+	dir, r, _ := w.repoDir(t, repo)
+	rng, _ := diffRange(dir, r, scope)
+	for _, f := range files {
+		if f.Path != path {
+			continue
+		}
+		args := append(append([]string{"diff"}, rng...), "--", ":(literal)"+path)
+		if f.New {
+			args = []string{"diff", "--no-index", "--", os.DevNull, path}
+		}
+		return gitCapped(dir, maxDiffBytes, args...)
+	}
+	return "", false, fmt.Errorf("%s is not changed in %s", path, scope)
+}
+
+// gitCapped streams git's stdout and stops at max bytes, cut at a line end, so a huge
+// diff is never held in memory. The exit status is ignored: diff --no-index exits 1 on
+// any difference and a git stopped early exits nonzero; callers validate args first.
+func gitCapped(dir string, max int, args ...string) (string, bool, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", false, err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", false, err
+	}
+	b, _ := io.ReadAll(io.LimitReader(out, int64(max)+1))
+	cut := len(b) > max
+	if cut {
+		b = b[:max]
+		if i := bytes.LastIndexByte(b, '\n'); i >= 0 {
+			b = b[:i]
+		}
+		cmd.Process.Kill()
+	}
+	cmd.Wait()
+	return strings.TrimRight(string(b), "\n"), cut, nil
+}
+
+// Show returns the header and message of one commit in the track.
+func (w *Workspace) Show(t *Track, repo, sha string) (string, error) {
+	dir, r, err := w.repoDir(t, repo)
+	if err != nil {
+		return "", err
+	}
+	full, err := commitIn(dir, r, sha)
+	if err != nil {
+		return "", err
+	}
+	return git(dir, "show", "-s", "--format=fuller", full)
 }
 
 func lines(s string) []string {
