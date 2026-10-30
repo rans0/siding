@@ -94,7 +94,8 @@ pre.doc { margin: 0; padding: 16px 20px; white-space: pre-wrap; line-height: 1.6
 .md h3 { font-size: 14px; } .md h4 { font-size: 13px; color: var(--sub); }
 .md p, .md ul, .md ol, .md table, .md pre, .md blockquote { margin: 0 0 12px; }
 .md ul, .md ol { padding-left: 22px; } .md li { margin: 2px 0; }
-.md li.check { list-style: none; margin-left: -20px; } .md li.check input { margin: 0 6px 0 0; vertical-align: -1px; }
+.md li:has(> input[type=checkbox]:first-child) { list-style: none; }
+.md ul:has(> li > input[type=checkbox]) { padding-left: 2px; } .md li ul:has(> li > input[type=checkbox]) { padding-left: 22px; } .md li > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -1px; }
 .md code { background: var(--hunk-bg); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
 .md pre { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; overflow-x: auto; }
 .md pre code { background: none; padding: 0; }
