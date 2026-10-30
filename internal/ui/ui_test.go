@@ -208,3 +208,25 @@ func TestClassify(t *testing.T) {
 		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
+
+// Docs render the Markdown task docs use, with every piece of text escaped.
+func TestMarkdown(t *testing.T) {
+	src := "# PRD: x\n\nLoad **config** from `<env>` and *more*.\n\n- [x] done\n- [ ] todo\n\n1. one\n2. two\n\n" +
+		"| Repo | Why |\n| --- | --- |\n| app | a<b |\n\n```go\nif a < b {}\n```\n\n> note\n\n---\n\n" +
+		"[ok](https://x.dev) [bad](javascript:alert(1)) <script>alert(1)</script>\n"
+	got := string(markdown(src))
+	for _, want := range []string{
+		"<h1>PRD: x</h1>", "<strong>config</strong>", "<code>&lt;env&gt;</code>", "<em>more</em>",
+		`<input type="checkbox" disabled checked> done`, `<input type="checkbox" disabled> todo`,
+		"<ol>\n<li>one</li>", "<th>Repo</th>", "<td>a&lt;b</td>", "<pre><code>if a &lt; b {}\n</code></pre>",
+		"<blockquote>note</blockquote>", "<hr>", `<a href="https://x.dev" rel="noreferrer">ok</a>`,
+		"&lt;script&gt;",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "<script") || strings.Contains(got, `href="javascript`) {
+		t.Errorf("unsafe output:\n%s", got)
+	}
+}

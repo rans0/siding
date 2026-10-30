@@ -34,7 +34,7 @@
   <div id="view" class="view"></div>
 </main>
 </div>
-{{range .Docs}}<template id="d-{{.Name}}"><pre class="doc">{{.Body}}</pre></template>{{end}}
+{{range .Docs}}<template id="d-{{.Name}}"><article class="md">{{.Body}}</article></template>{{end}}
 {{template "viewer"}}
 </body>
 </html>

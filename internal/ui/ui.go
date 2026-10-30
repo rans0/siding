@@ -70,7 +70,9 @@ func (l fileList) Dir(f core.FileChange) string {
 	return ""
 }
 
-func (l fileList) Base(f core.FileChange) string { return f.Path[strings.LastIndexByte(f.Path, '/')+1:] }
+func (l fileList) Base(f core.FileChange) string {
+	return f.Path[strings.LastIndexByte(f.Path, '/')+1:]
+}
 
 // URL of one file's diff, path query-escaped so names like "a&b" survive.
 func (l fileList) URL(f core.FileChange) string { return l.Src + "&path=" + url.QueryEscape(f.Path) }
@@ -87,7 +89,10 @@ type repoReport struct {
 	Uncommitted, Committed fileList
 }
 
-type doc struct{ Name, Body string }
+type doc struct {
+	Name string
+	Body template.HTML
+}
 
 // Handler serves the board. token guards the gate actions against cross-site posts;
 // it lives only as long as the server.
@@ -143,7 +148,7 @@ func Handler(w *core.Workspace) http.Handler {
 		var docs []doc
 		for _, name := range []string{"review.md", "prd.md", "plan.md", "testing.md", "log.md"} {
 			if b, err := os.ReadFile(filepath.Join(w.Root, t.Docs, name)); err == nil {
-				docs = append(docs, doc{name, string(b)})
+				docs = append(docs, doc{name, markdown(string(b))})
 			}
 		}
 		render(rw, "track.html", map[string]any{
