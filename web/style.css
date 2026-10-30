@@ -68,3 +68,18 @@ details.file[open] > summary { border-bottom: 1px solid var(--line); }
 .diff-t tr.add { background: var(--add-bg); } .diff-t tr.del { background: var(--del-bg); }
 .diff-t tr.hunk { background: var(--hunk-bg); color: var(--sub); }
 .diff-t tr.add, .diff-t tr.del { color: var(--text); }
+
+.detail.wide { max-width: 1400px; }
+.review { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
+.filenav { position: sticky; top: 0; max-height: 100vh; overflow: auto; padding: 4px 0 16px; }
+.filenav ol { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.filenav li { display: flex; gap: 6px; padding: 2px 0; }
+.filenav li a { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.filenav li a:hover { text-decoration: underline; }
+.filenav li.group { color: var(--sub); font-weight: 600; margin-top: 8px; }
+details.file { scroll-margin-top: 8px; }
+@media (max-width: 800px) {
+  .review { grid-template-columns: 1fr; }
+  .filenav { position: static; max-height: 40vh; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+}
+.review:has(> .filenav[hidden]) { grid-template-columns: 1fr; }
