@@ -3,7 +3,6 @@
 package ui
 
 import (
-	"bufio"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -14,11 +13,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/rans0/siding"
 	"github.com/rans0/siding/internal/core"
-	"golang.org/x/net/websocket"
 )
 
 var pages = template.Must(template.ParseFS(siding.Assets, "web/*.html"))
@@ -47,7 +46,11 @@ var columnOf = map[string]int{
 	core.StageShip:  3,
 }
 
-type diffLine struct{ Class, Text string }
+// diffLine is one row of a rendered diff; Old and New are line numbers, 0 when absent.
+type diffLine struct {
+	Class, Text string
+	Old, New    int
+}
 
 type commit struct{ SHA, Subject string }
 
@@ -141,7 +144,7 @@ func Handler(w *core.Workspace) http.Handler {
 		}
 		render(rw, "track.html", map[string]any{
 			"T": t, "Stage": core.StageLabel[t.Status], "AtGate": atGate(t), "Token": token,
-			"Reports": reports, "Docs": docs, "HasTerminal": w.SessionRunning(t.Task),
+			"Reports": reports, "Docs": docs,
 			"Error": r.URL.Query().Get("error"),
 		})
 	})
@@ -173,24 +176,6 @@ func Handler(w *core.Workspace) http.Handler {
 			return
 		}
 		render(rw, "diff", map[string]any{"Lines": classify(d), "Cut": cut})
-	})
-	mux.HandleFunc("GET /xterm/", func(rw http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(rw, r, siding.Assets, "web"+r.URL.Path)
-	})
-	mux.HandleFunc("GET /t/{task}/pty", func(rw http.ResponseWriter, r *http.Request) {
-		// Browsers always send Origin on websockets and cannot forge it, so a foreign
-		// page cannot type into the agent; the token covers non-browser clients too.
-		if u, err := url.Parse(r.Header.Get("Origin")); err != nil || u.Host != r.Host ||
-			subtle.ConstantTimeCompare([]byte(r.URL.Query().Get("token")), []byte(token)) != 1 {
-			http.Error(rw, "forbidden", http.StatusForbidden)
-			return
-		}
-		c, err := w.Attach(r.PathValue("task"))
-		if err != nil {
-			http.Error(rw, "no running session", http.StatusNotFound)
-			return
-		}
-		websocket.Server{Handler: func(ws *websocket.Conn) { bridge(ws, c) }}.ServeHTTP(rw, r)
 	})
 	mux.HandleFunc("GET /inbox", func(rw http.ResponseWriter, r *http.Request) {
 		props, err := w.Inbox()
@@ -245,39 +230,6 @@ func Handler(w *core.Workspace) http.Handler {
 	return localOnly(mux)
 }
 
-// bridge copies between the browser terminal and the agent's session. The first text
-// frame carries the session's "cols rows"; output goes as binary frames, input comes as text.
-func bridge(ws *websocket.Conn, c net.Conn) {
-	defer c.Close()
-	defer ws.Close()
-	r := bufio.NewReader(c)
-	size, err := r.ReadString('\n')
-	if err != nil {
-		return
-	}
-	websocket.Message.Send(ws, strings.TrimSpace(size))
-	go func() {
-		defer c.Close()
-		for {
-			var in string
-			if websocket.Message.Receive(ws, &in) != nil {
-				return
-			}
-			c.Write([]byte(in))
-		}
-	}()
-	b := make([]byte, 32<<10)
-	for {
-		n, err := r.Read(b)
-		if n > 0 && websocket.Message.Send(ws, b[:n]) != nil {
-			return
-		}
-		if err != nil {
-			return
-		}
-	}
-}
-
 func validToken(rw http.ResponseWriter, r *http.Request, token string) bool {
 	if subtle.ConstantTimeCompare([]byte(r.PostFormValue("token")), []byte(token)) != 1 {
 		http.Error(rw, "stale page, reload and try again", http.StatusForbidden)
@@ -288,24 +240,44 @@ func validToken(rw http.ResponseWriter, r *http.Request, token string) bool {
 
 func atGate(t *core.Track) bool { return t.Status == core.StageGate1 || t.Status == core.StageGate2 }
 
+// classify turns a git diff into rows with line numbers. File headers (diff, index,
+// ---, +++, mode lines) are dropped: the file block already names the file.
 func classify(diff string) []diffLine {
-	if diff == "" {
-		return nil
-	}
 	var out []diffLine
-	for _, l := range strings.Split(diff, "\n") {
-		c := ""
+	ol, nl, inHunk := 0, 0, false
+	for _, l := range strings.Split(strings.TrimSuffix(diff, "\n"), "\n") {
 		switch {
-		case strings.HasPrefix(l, "+++ "), strings.HasPrefix(l, "--- "), strings.HasPrefix(l, "diff "), strings.HasPrefix(l, "@@"):
-			c = "hunk"
+		case strings.HasPrefix(l, "@@"):
+			inHunk = true
+			if f := strings.Fields(l); len(f) > 2 {
+				ol, nl = atoi(f[1]), atoi(f[2])
+			}
+			out = append(out, diffLine{Class: "hunk", Text: l})
+		case !inHunk:
+			if strings.HasPrefix(l, "Binary files") {
+				out = append(out, diffLine{Class: "hunk", Text: l})
+			}
 		case strings.HasPrefix(l, "+"):
-			c = "add"
+			out = append(out, diffLine{Class: "add", Text: l, New: nl})
+			nl++
 		case strings.HasPrefix(l, "-"):
-			c = "del"
+			out = append(out, diffLine{Class: "del", Text: l, Old: ol})
+			ol++
+		case strings.HasPrefix(l, "\\"):
+			out = append(out, diffLine{Class: "hunk", Text: l})
+		default:
+			out = append(out, diffLine{Text: l, Old: ol, New: nl})
+			ol++
+			nl++
 		}
-		out = append(out, diffLine{c, l})
 	}
 	return out
+}
+
+// atoi reads the start line of a hunk range like "-12,5" or "+7".
+func atoi(r string) int {
+	n, _ := strconv.Atoi(strings.SplitN(r[1:], ",", 2)[0])
+	return n
 }
 
 func render(rw http.ResponseWriter, name string, data any) {

@@ -3,8 +3,9 @@
 <summary><code>{{.Path}}</code> {{if .New}}<span class="add">new</span>{{else if .Binary}}<span class="hunk">binary</span>{{else}}<span class="add">+{{.Add}}</span> <span class="del">-{{.Del}}</span>{{end}}</summary><div class="diff"><p class="empty">Loading…</p></div></details>
 {{end}}{{with .Hidden}}<p class="empty">{{.}} more untracked file(s) not listed.</p>{{end}}{{end}}
 
-{{define "diff"}}<pre>{{range .Lines}}<span class="{{.Class}}">{{.Text}}</span>
-{{end}}</pre>{{if .Cut}}<p class="empty">Cut at 1 MiB. Run <code>git diff</code> in the worktree for the rest.</p>{{end}}{{end}}
+{{define "diff"}}{{if .Lines}}<table class="diff-t">{{range .Lines}}{{if eq .Class "hunk"}}<tr class="hunk"><td class="ln" colspan="2"></td><td>{{.Text}}</td></tr>
+{{else}}<tr{{with .Class}} class="{{.}}"{{end}}><td class="ln">{{with .Old}}{{.}}{{end}}</td><td class="ln">{{with .New}}{{.}}{{end}}</td><td>{{.Text}}</td></tr>
+{{end}}{{end}}</table>{{else}}<p class="empty">No line changes (mode or empty file).</p>{{end}}{{if .Cut}}<p class="empty">Cut at 1 MiB. Run <code>git diff</code> in the worktree for the rest.</p>{{end}}{{end}}
 
 {{define "lazydiff"}}<script>
 (() => {

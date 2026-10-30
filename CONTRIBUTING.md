@@ -18,8 +18,8 @@ To try it end to end, build the binary, put it on your `PATH`, and use a scratch
 | --- | --- |
 | `cmd/siding` | CLI: flag parsing and output only |
 | `internal/core` | Everything else: workspace, tracks, stages, adapters, guard, learn, doctor, PTY sessions |
-| `internal/ui` | Board: HTTP handlers and the terminal websocket |
-| `web/` | Board templates and CSS; `web/xterm/` is vendored xterm.js |
+| `internal/ui` | Board: HTTP handlers |
+| `web/` | Board templates and CSS |
 | `templates/` | `AGENTS.md.tmpl`, default `siding.toml`, task doc templates |
 | `starter-knowledge/` | Rules and skills copied into a new workspace |
 | `embed.go` | Embeds `web`, `templates` and `starter-knowledge` into the binary |
@@ -78,6 +78,3 @@ Check hook payload formats against the harness's current docs; they change.
 
 Push a tag `vX.Y.Z`. The release workflow runs the tests, then GoReleaser builds binaries for Linux, macOS and Windows and updates the Homebrew tap and Scoop bucket. It needs a `TAP_TOKEN` secret that can push to `rans0/homebrew-tap` and `rans0/scoop-bucket`.
 
-## Vendored xterm.js
-
-`web/xterm/` holds `xterm.js`, `xterm.css` and `LICENSE` from the `@xterm/xterm` npm package. To upgrade, replace all three from the new version and check the board terminal in a browser.

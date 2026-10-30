@@ -573,7 +573,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space
 <span class="prompt">$ </span>siding adapter install claude      <span class="cmt"># or: codex, cursor, opencode, agents</span>
 
 <span class="prompt">$ </span>siding new add-promo backend,web   <span class="cmt"># tracks/add-promo/{backend,web}</span>
-<span class="prompt">$ </span>siding open add-promo              <span class="cmt"># agent in this terminal, also live on the board</span>
+<span class="prompt">$ </span>siding open add-promo              <span class="cmt"># agent in this terminal</span>
 <span class="prompt">$ </span>siding ui                          <span class="cmt"># board at http://127.0.0.1:4747</span>
 <span class="prompt">$ </span>siding approve add-promo           <span class="cmt"># you pass Gate 1, later Gate 2</span>
 <span class="prompt">$ </span>siding pr add-promo                <span class="cmt"># commit, push, one PR per repo</span>
@@ -665,8 +665,7 @@ siding init /tmp/ws   <span class="cmt"># scratch workspace</span></pre>
 
     <div class="open">
       <div class="ticket reveal"><small>Roadmap</small><b>Sessions that outlive the terminal</b><p>Keep the agent PTY alive after the starting terminal closes.</p></div>
-      <div class="ticket reveal"><small>Roadmap · Windows</small><b>Live board terminal via ConPTY</b><p>Today the board shows no terminal on Windows.</p></div>
-      <div class="ticket reveal"><small>Adapter</small><b>Bring your harness</b><p>Add an entry to <code>adapters</code>, handle its hook in <code>Guard</code>, cover it in <code>TestGuardPayloads</code> and <code>TestAdapterFiles</code>.</p></div>
+            <div class="ticket reveal"><small>Adapter</small><b>Bring your harness</b><p>Add an entry to <code>adapters</code>, handle its hook in <code>Guard</code>, cover it in <code>TestGuardPayloads</code> and <code>TestAdapterFiles</code>.</p></div>
     </div>
 
     <div class="cta">
@@ -715,7 +714,7 @@ tabs(document.querySelector(".tabs"), t => document.querySelectorAll(".tabpanel"
 const steps = [
   { s: "1", t: "Start", who: "you", text: "Create a track: one worktree per repo on a shared branch, setup commands run, AGENTS.md written. Then start the agent inside it.",
     files: "tracks/add-promo/{backend,web}<br>tracks/add-promo/AGENTS.md",
-    term: ["$ siding new add-promo backend,web", "# worktrees on rans/add-promo, base recorded in .track.json", "$ siding open add-promo", "# agent starts here, also live on the board"] },
+    term: ["$ siding new add-promo backend,web", "# worktrees on rans/add-promo, base recorded in .track.json", "$ siding open add-promo", "# agent starts here"] },
   { s: "2", t: "PRD", who: "agent", text: "The agent reads AGENTS.md, loads the prd skill and writes the product requirements. Then it submits and stops.",
     files: "docs/2026-10-18_add-promo/prd.md",
     term: ["# agent writes prd.md", "$ siding submit add-promo", "# stage: prd → GATE 1. agent stops."] },
@@ -726,7 +725,7 @@ const steps = [
     files: "plan.md · testing.md<br>tracks/add-promo/backend/…<br>tracks/add-promo/web/…",
     term: ["# agent: plan → tests → code", "$ siding submit add-promo", "# stage: build → GATE 2. agent stops."] },
   { s: "G2", gate: 1, t: "Gate 2", who: "you", text: "Review the diff on the board, file by file, uncommitted vs committed. Or get the base, commits and diffstat per repo in the terminal.",
-    files: "board: per-file diff, commits, docs, live terminal",
+    files: "board: per-file diff, commits, docs",
     term: ["$ siding report add-promo", "# base, commits since base, diffstat per repo", "$ siding approve add-promo", "# GATE 2 → ship"] },
   { s: "4", t: "Ship", who: "you", text: "siding commits, pushes and opens one PR per repo with gh. Title and body come from prd.md. --push-only skips gh.",
     files: "one PR per repo",
@@ -808,7 +807,7 @@ const cmds = [
   ["siding report <task>", "Base, commits since base and diffstat per repo"],
   ["siding pr <task> [--push-only]", "After Gate 2: commit, push and open a PR per repo with gh; title and body from prd.md"],
   ["siding next <task>", "After the PR merges: start the next cycle on the same branches"],
-  ["siding ui [--port N]", "Board on 127.0.0.1:4747: tracks by stage, per-file diffs, commits, docs, live terminal, gate buttons, Inbox, Health"],
+  ["siding ui [--port N]", "Board on 127.0.0.1:4747: tracks by stage, per-file diffs, commits, docs, gate buttons, Inbox, Health"],
   ["siding review <task>", "Deep-review a finished task on the latest base: report first, then fix through the gates"],
   ["siding done <task> [--force]", "Remove the track's worktrees once log.md exists; task docs are kept"],
   ["siding adapter install <agents|claude|codex|cursor|opencode>", "Set up required tools and skills, write harness files into tracks"],

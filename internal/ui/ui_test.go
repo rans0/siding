@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -190,5 +191,20 @@ func TestCommitPage(t *testing.T) {
 	}
 	if code, _ := serve(h, "/t/feat/app/HEAD"); code != 404 {
 		t.Errorf("non-sha got %d, want 404", code)
+	}
+}
+
+// Diff rows carry old/new line numbers and drop git's file headers.
+func TestClassify(t *testing.T) {
+	d := "diff --git a/f b/f\nindex 1..2 100644\n--- a/f\n+++ b/f\n@@ -3,2 +3,2 @@ fn\n ctx\n-old\n+new\n"
+	got := classify(d)
+	want := []diffLine{
+		{Class: "hunk", Text: "@@ -3,2 +3,2 @@ fn"},
+		{Text: " ctx", Old: 3, New: 3},
+		{Class: "del", Text: "-old", Old: 4},
+		{Class: "add", Text: "+new", New: 4},
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
