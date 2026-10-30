@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/rans0/siding"
 )
 
 type adapter struct {
@@ -53,7 +55,7 @@ func (w *Workspace) AdapterInstall(name string) error {
 	}
 	errs = append(errs, w.FetchSkills())
 	if name == "claude" {
-		errs = append(errs, w.installClaudePlugins())
+		errs = append(errs, w.installClaudePlugins(), claudeRoot(w))
 	}
 	if !slices.Contains(w.Local.Adapters, name) {
 		w.Local.Adapters = append(w.Local.Adapters, name)
@@ -97,6 +99,14 @@ func (w *Workspace) installClaudePlugins() error {
 	return errors.Join(errs...)
 }
 
+// guardHooks runs `siding guard` before Claude Code edits or shell commands.
+var guardHooks = map[string]any{
+	"PreToolUse": []any{map[string]any{
+		"matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
+		"hooks":   []any{map[string]any{"type": "command", "command": "siding guard"}},
+	}},
+}
+
 // claudeTrack writes CLAUDE.md, a /siding slash command, and a PreToolUse guard for repos/.
 func claudeTrack(w *Workspace, t *Track) error {
 	dir := w.trackDir(t.Task)
@@ -109,12 +119,7 @@ func claudeTrack(w *Workspace, t *Track) error {
 	}
 	settings, _ := json.MarshalIndent(map[string]any{
 		"enabledPlugins": plugins,
-		"hooks": map[string]any{
-			"PreToolUse": []any{map[string]any{
-				"matcher": "Edit|MultiEdit|Write|NotebookEdit|Bash",
-				"hooks":   []any{map[string]any{"type": "command", "command": "siding guard"}},
-			}},
-		},
+		"hooks":          guardHooks,
 	}, "", "  ")
 	files := map[string]string{
 		"CLAUDE.md":                  "@AGENTS.md\n",
@@ -122,6 +127,27 @@ func claudeTrack(w *Workspace, t *Track) error {
 		".claude/settings.json":      string(settings) + "\n",
 	}
 	return writeFiles(dir, files)
+}
+
+// claudeRoot sets up the workspace root for the dispatcher session: a /dispatch command,
+// the dispatch skill, and the guard, because subagents it spawns into tracks run with the root's hooks, not the
+// track's. Existing files are left alone: they may be the user's.
+func claudeRoot(w *Workspace) error {
+	files := map[string]string{
+		".claude/commands/dispatch.md": "---\ndescription: Dispatch tasks to tracks, each worked by a subagent\n---\n" +
+			"Read and follow `knowledge/skills/dispatch.md`. The user's request: $ARGUMENTS\n",
+		".claude/settings.json": jsonFile(map[string]any{"hooks": guardHooks}),
+	}
+	// Workspaces made before the dispatch skill existed get it here.
+	if skill, err := siding.Assets.ReadFile("starter-knowledge/skills/dispatch.md"); err == nil {
+		files["knowledge/skills/dispatch.md"] = string(skill)
+	}
+	for name := range files {
+		if _, err := os.Stat(w.path(filepath.FromSlash(name))); err == nil {
+			delete(files, name)
+		}
+	}
+	return writeFiles(w.Root, files)
 }
 
 func writeFiles(dir string, files map[string]string) error {

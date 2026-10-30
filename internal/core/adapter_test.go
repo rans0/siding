@@ -58,3 +58,27 @@ func TestAdapterFiles(t *testing.T) {
 		}
 	}
 }
+
+// The claude adapter gives the root a /dispatch command and the guard, keeping files the user wrote.
+func TestClaudeRoot(t *testing.T) {
+	w := &Workspace{Root: t.TempDir()}
+	os.MkdirAll(w.path(".claude"), 0o755)
+	os.WriteFile(w.path(".claude", "settings.json"), []byte("{}"), 0o644)
+	if err := claudeRoot(w); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(w.path(".claude", "commands", "dispatch.md")); !strings.Contains(string(b), "knowledge/skills/dispatch.md") {
+		t.Errorf("dispatch command:\n%s", b)
+	}
+	if _, err := os.Stat(w.path("knowledge", "skills", "dispatch.md")); err != nil {
+		t.Error("dispatch skill not copied")
+	}
+	if b, _ := os.ReadFile(w.path(".claude", "settings.json")); string(b) != "{}" {
+		t.Errorf("user settings overwritten:\n%s", b)
+	}
+	os.Remove(w.path(".claude", "settings.json"))
+	claudeRoot(w)
+	if b, _ := os.ReadFile(w.path(".claude", "settings.json")); !json.Valid(b) || !strings.Contains(string(b), "siding guard") {
+		t.Errorf("root settings:\n%s", b)
+	}
+}
