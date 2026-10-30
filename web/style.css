@@ -40,8 +40,11 @@ pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px
 pre.doc { white-space: pre-wrap; }
 details { margin-bottom: 8px; }
 summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
-.gatebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px;
-           border: 1px solid var(--gate); background: var(--gate-bg); border-radius: 8px; }
+/* Pinned to the bottom so the decision stays in reach while scrolling the diff. */
+.gatebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px;
+           border-top: 1px solid var(--gate); background: var(--gate-bg);
+           position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; margin: 0 !important; }
+.detail:has(.gatebar) { padding-bottom: 96px; }
 .gatebar form { margin: 0; }
 button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line);
          background: var(--card); color: var(--text); cursor: pointer; }
