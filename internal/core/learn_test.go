@@ -20,6 +20,8 @@ func TestLearnAndDoctor(t *testing.T) {
 	clone := filepath.Join(ws, "repos", "backend")
 	os.MkdirAll(filepath.Join(clone, "scripts"), 0o755)
 	os.WriteFile(filepath.Join(clone, "scripts", "db-up.sh"), nil, 0o644)
+	os.MkdirAll(filepath.Join(clone, "src", "api", "booking"), 0o755)
+	os.WriteFile(filepath.Join(clone, "src", "api", "booking", "checkout.ts"), nil, 0o644)
 	gitT(t, clone, "init", "-q")
 
 	inbox := filepath.Join(ws, "knowledge", "inbox")
@@ -29,7 +31,7 @@ func TestLearnAndDoctor(t *testing.T) {
 	write("3.md", "---\nrepo: skill:debug\ntrack: promo\n---\n# debug\nBisect first.\n")
 	write("4.md", "---\nrepo: nope\n---\nx\n")
 	write("6.md", "---\nrepo: skill:debug\ntrack: promo\ndate: 2026-09-28\n---\nPrint the seed.\n")
-	write("5.md", "---\nrepo: rule:style\ntrack: promo\ndate: 2026-09-28\n---\nNo comments that restate code.\n")
+	write("5.md", "---\nrule: style\ntrack: promo\ndate: 2026-09-28\n---\nNo comments that restate code.\n") // the slip agents make
 
 	props, err := w.Inbox()
 	if err != nil || len(props) != 6 || props[0].Repo != "backend" || props[0].Commit != "a1b2c3d" {
@@ -53,6 +55,11 @@ func TestLearnAndDoctor(t *testing.T) {
 	if err := w.Reject("4.md"); err != nil {
 		t.Fatal(err)
 	}
+	write("7.md", "---\ntrack: promo\n---\nNo target.\n")
+	if _, err := w.Accept("7.md", ""); err == nil || !strings.Contains(err.Error(), "no target") {
+		t.Fatalf("missing target: %v", err)
+	}
+	w.Reject("7.md")
 	if _, err := w.Accept("../siding.toml", ""); err == nil {
 		t.Fatal("path traversal accepted")
 	}
@@ -71,10 +78,17 @@ func TestLearnAndDoctor(t *testing.T) {
 		t.Fatalf("rule:\n%s", b)
 	}
 
-	// orphaned worktree: git knows it, no track claims it
+	// shortened and extensionless paths, elided paths and remote refs are not stale
+	f, _ := os.OpenFile(filepath.Join(ws, "knowledge/repos/backend.md"), os.O_APPEND|os.O_WRONLY, 0o644)
+	f.WriteString("- `booking/checkout.ts`, `api/booking`, `booking/checkout`, `src/.../checkout.ts`, `origin/main`.\n")
+	f.Close()
+
+	// orphaned worktree: git knows it, no track claims it; a deleted one only needs a prune
 	gitT(t, clone, "add", ".")
 	gitT(t, clone, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init")
 	gitT(t, clone, "worktree", "add", "-q", filepath.Join(w.Root, "tracks", "ghost", "backend"))
+	gitT(t, clone, "worktree", "add", "-q", "-b", "gone", filepath.Join(w.Root, "tracks", "gone", "backend"))
+	os.RemoveAll(filepath.Join(w.Root, "tracks", "gone"))
 
 	var got []string
 	for _, p := range w.Doctor() {
@@ -88,10 +102,14 @@ func TestLearnAndDoctor(t *testing.T) {
 		`env_ports entry "PORT" is not KEY=port`,
 		"worktree: orphaned worktree",
 		"stale: knowledge/repos/backend.md:4: `scripts/gone.sh` not found",
+		"still registers deleted worktree",
 	} {
 		if !strings.Contains(all, s) {
 			t.Errorf("doctor missing %q in:\n%s", s, all)
 		}
+	}
+	if strings.Contains(all, "backend.md:5") || strings.Contains(all, "orphaned worktree "+filepath.Join(w.Root, "tracks", "gone")) {
+		t.Errorf("false positive:\n%s", all)
 	}
 	if strings.Contains(all, "db-up.sh") {
 		t.Errorf("existing path flagged stale:\n%s", all)

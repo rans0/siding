@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -69,6 +70,10 @@ func (w *Workspace) Doctor() []Problem {
 			if !ok || !strings.HasPrefix(dir, tracksDir) || want[dir] {
 				continue
 			}
+			if _, err := os.Stat(dir); err != nil {
+				add("worktree", "repos/%s still registers deleted worktree %s (git -C repos/%s worktree prune)", name, dir, name)
+				continue
+			}
 			add("worktree", "orphaned worktree %s of repos/%s (git -C repos/%s worktree remove --force %s)", dir, name, name, dir)
 		}
 	}
@@ -81,8 +86,11 @@ func (w *Workspace) Doctor() []Problem {
 
 var pathRe = regexp.MustCompile("`([A-Za-z0-9_.-]+/[A-Za-z0-9_./-]*[A-Za-z0-9_-])`")
 
-// StaleFacts flags lines in knowledge/repos/<repo>.md that name a path (`dir/file`) no
-// longer present in the repo's main clone.
+// StaleFacts flags lines in knowledge/repos/<repo>.md that name a path (`dir/file`) matching
+// no file or directory the repo's main clone tracks. Facts often shorten paths
+// (`booking/providers/x.ts` for `src/api/booking/providers/x.ts`) or drop the extension
+// (`models/booking`), so a path counts as present when it ends a tracked path at a / boundary,
+// with or without an extension.
 // ponytail: only slash-containing backticked paths are checked; bare file names and symbols
 // are not, since they can't be told apart from commands. Add symbol lookup if facts rot unseen.
 func (w *Workspace) StaleFacts() []string {
@@ -94,18 +102,45 @@ func (w *Workspace) StaleFacts() []string {
 		if _, err := os.Stat(clone); err != nil {
 			continue
 		}
+		known := trackedPaths(clone)
 		b, _ := os.ReadFile(f)
 		for i, l := range strings.Split(string(b), "\n") {
 			for _, m := range pathRe.FindAllStringSubmatch(l, -1) {
 				p := m[1]
-				if strings.HasPrefix(p, "../") || slices.Contains(strings.Split(p, "/"), "..") {
+				if slices.Contains(strings.Split(p, "/"), "..") || strings.Contains(p, "...") || strings.HasPrefix(p, "origin/") {
 					continue
 				}
-				if _, err := os.Stat(filepath.Join(clone, p)); err != nil {
+				if _, err := os.Stat(filepath.Join(clone, p)); err != nil && !known(p) {
 					out = append(out, fmt.Sprintf("knowledge/repos/%s.md:%d: `%s` not found in repos/%s", repo, i+1, p, repo))
 				}
 			}
 		}
 	}
 	return out
+}
+
+// trackedPaths returns a lookup for a path suffix among the files git tracks in clone and
+// their directories, with each file also listed without its extension.
+func trackedPaths(clone string) func(string) bool {
+	out, _ := gitOut(clone, "ls-files", "-z")
+	set := map[string]bool{}
+	for _, f := range strings.Split(out, "\x00") {
+		if f == "" {
+			continue
+		}
+		set[f] = true
+		set[strings.TrimSuffix(f, filepath.Ext(f))] = true
+		for d := path.Dir(f); d != "."; d = path.Dir(d) {
+			set[d] = true
+		}
+	}
+	return func(p string) bool {
+		p = strings.TrimSuffix(strings.TrimPrefix(p, "./"), "/")
+		for k := range set {
+			if k == p || strings.HasSuffix(k, "/"+p) {
+				return true
+			}
+		}
+		return false
+	}
 }

@@ -52,6 +52,10 @@ func parseProposal(s string) Proposal {
 				switch strings.TrimSpace(k) {
 				case "repo":
 					p.Repo = v
+				case "rule", "skill": // "rule: scope" is a common slip for "repo: rule:scope"
+					if p.Repo == "" {
+						p.Repo = strings.TrimSpace(k) + ":" + v
+					}
 				case "track":
 					p.Track = v
 				case "date":
@@ -105,6 +109,9 @@ func (w *Workspace) Accept(file, body string) (string, error) {
 		dest = w.path("knowledge", "rules", name+".md")
 		text = fact(p)
 	} else {
+		if p.Repo == "" {
+			return "", errors.New("proposal has no target: add `repo: <repo>`, `repo: rule:<name>` or `repo: skill:<name>` to its frontmatter")
+		}
 		if err := validName("repo", p.Repo); err != nil {
 			return "", err
 		}
