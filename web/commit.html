@@ -10,7 +10,7 @@
 <header><h1><a href="/">siding</a> / <a href="/t/{{.T.Task}}">{{.T.Task}}</a> / {{.Repo}}</h1><span><code>{{.SHA}}</code></span></header>
 <div class="detail">
 <pre class="doc">{{.Msg}}</pre>
-<section>{{template "files" .Files}}</section>
+<section><div class="diffhead"><h2>Files</h2><button type="button" class="diff-mode" aria-pressed="false">Split</button></div>{{template "files" .Files}}</section>
 </div>
 {{template "lazydiff"}}
 </body>

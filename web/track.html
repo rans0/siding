@@ -21,7 +21,7 @@
 <section class="review">
   <nav class="filenav" aria-label="Changed files"><h2>Files</h2><ol id="filenav"></ol></nav>
   <div>
-  <h2>Changes</h2>
+  <div class="diffhead"><h2>Changes</h2><button type="button" class="diff-mode" aria-pressed="false">Split</button></div>
   {{range .Reports}}
   <details open>
     <summary>{{.R.Name}} · <code>{{.R.Branch}}</code> from <code>{{.R.Base}}</code> · {{len .R.Commits}} commit(s)</summary>

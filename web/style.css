@@ -83,3 +83,9 @@ details.file { scroll-margin-top: 8px; }
   .filenav { position: static; max-height: 40vh; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
 }
 .review:has(> .filenav[hidden]) { grid-template-columns: 1fr; }
+.diffhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.diffhead h2 { margin: 0; } .diff-mode { padding: 2px 10px; font-size: 12px; }
+body:not(.split) .diff-t.s, body.split .diff-t.u { display: none; }
+.diff-t.s { table-layout: fixed; } .diff-t.s col.ln { width: 4em; } .diff-t.s td:last-child { width: auto; }
+.diff-t.s td:not(.ln) { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.diff-t td.add { background: var(--add-bg); } .diff-t td.del { background: var(--del-bg); } .diff-t td.none { background: var(--hunk-bg); }

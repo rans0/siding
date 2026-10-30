@@ -3,12 +3,39 @@
 <summary><code>{{.Path}}</code> {{if .New}}<span class="add">new</span>{{else if .Binary}}<span class="hunk">binary</span>{{else}}<span class="add">+{{.Add}}</span> <span class="del">-{{.Del}}</span>{{end}}</summary><div class="diff"><p class="empty">Loading…</p></div></details>
 {{end}}{{with .Hidden}}<p class="empty">{{.}} more untracked file(s) not listed.</p>{{end}}{{end}}
 
-{{define "diff"}}{{if .Lines}}<table class="diff-t">{{range .Lines}}{{if eq .Class "hunk"}}<tr class="hunk"><td class="ln" colspan="2"></td><td>{{.Text}}</td></tr>
+{{define "diff"}}{{if .Lines}}<table class="diff-t u">{{range .Lines}}{{if eq .Class "hunk"}}<tr class="hunk"><td class="ln" colspan="2"></td><td>{{.Text}}</td></tr>
 {{else}}<tr{{with .Class}} class="{{.}}"{{end}}><td class="ln">{{with .Old}}{{.}}{{end}}</td><td class="ln">{{with .New}}{{.}}{{end}}</td><td>{{.Text}}</td></tr>
 {{end}}{{end}}</table>{{else}}<p class="empty">No line changes (mode or empty file).</p>{{end}}{{if .Cut}}<p class="empty">Cut at 1 MiB. Run <code>git diff</code> in the worktree for the rest.</p>{{end}}{{end}}
 
 {{define "lazydiff"}}<script>
 (() => {
+  // split rebuilds a unified table side by side: each run of removed lines pairs with
+  // the added run that follows it; context goes on both sides, hunk headers span both.
+  const split = (u) => {
+    const t = document.createElement("table"); t.className = "diff-t s"
+    t.innerHTML = '<colgroup><col class="ln"><col><col class="ln"><col></colgroup>'
+    const cell = (tag, cls, text) => { const c = document.createElement(tag); if (cls) c.className = cls; c.textContent = text; return c }
+    const side = (r) => r
+      ? [cell("td", "ln", r.cells[r.cells[0].textContent ? 0 : 1].textContent), cell("td", r.className, r.cells[2].textContent.slice(1))]
+      : [cell("td", "ln", ""), cell("td", "none", "")]
+    const rows = [...u.rows]
+    for (let i = 0; i < rows.length;) {
+      const r = rows[i]
+      if (r.className === "hunk") { const tr = t.insertRow(); tr.className = "hunk"; tr.append(cell("td", "ln", ""), Object.assign(cell("td", "", r.cells[1].textContent), { colSpan: 3 })); i++; continue }
+      if (r.className !== "del" && r.className !== "add") { const tr = t.insertRow(); tr.append(...side(r), cell("td", "ln", r.cells[1].textContent), cell("td", "", r.cells[2].textContent.slice(1))); i++; continue }
+      const dels = [], adds = []
+      while (rows[i]?.className === "del") dels.push(rows[i++])
+      while (rows[i]?.className === "add") adds.push(rows[i++])
+      for (let k = 0; k < Math.max(dels.length, adds.length); k++) { const tr = t.insertRow(); tr.append(...side(dels[k]), ...side(adds[k])) }
+    }
+    return t
+  }
+  const mode = document.querySelector(".diff-mode")
+  if (mode) {
+    const set = (on) => { document.body.classList.toggle("split", on); mode.setAttribute("aria-pressed", on); mode.textContent = on ? "Unified" : "Split" }
+    try { set(localStorage.getItem("siding.split") === "1") } catch {}
+    mode.onclick = () => { const on = !document.body.classList.contains("split"); set(on); try { localStorage.setItem("siding.split", on ? "1" : "0") } catch {} }
+  }
   const load = (d) => {
     if (!d.open || d.dataset.loaded) return
     d.dataset.loaded = 1
@@ -16,6 +43,8 @@
     fetch(d.dataset.src).then(async (r) => {
       if (!r.ok) throw new Error(await r.text())
       body.innerHTML = await r.text()
+      const u = body.querySelector("table.u")
+      if (u) u.after(split(u))
     }).catch((e) => { body.innerHTML = ""; const p = document.createElement("p"); p.className = "err"; p.textContent = e.message; body.append(p); delete d.dataset.loaded })
   }
   document.querySelectorAll("details.file").forEach((d) => { d.addEventListener("toggle", () => load(d)); load(d) })
