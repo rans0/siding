@@ -55,7 +55,7 @@ One branch for a whole epic (feature A ships, then B and C on the same branch): 
 
 Later, to deep-review a finished task: `siding review add-promo` creates track `review-add-promo` on the latest base of the same repos, with the task's commit range and docs in `AGENTS.md`. The agent writes `review.md` (likely issues, repo patterns, PRD still met, performance, tech debt; each finding with severity, `file:line` and a fix), turns the findings into `prd.md` and stops at Gate 1. You pick what gets fixed; the fixes then follow the normal build, Gate 2 and PR flow. `done` keeps a `track.json` in the task docs so this works after the worktrees are gone.
 
-Several tracks can run at once, each in its own terminal, on its own ports. If something looks wrong, run `siding doctor`.
+Several tracks can run at once, each in its own terminal, on its own ports. Or run them all from one session: start Claude Code in the workspace root and type `/dispatch add a promo banner to backend and web`. The main session creates the track and hands it to a background subagent, so you can give the next task right away. Before Gate 2, each worker gets a review from a fresh subagent. The main session tells you when a track reaches a gate. You approve as usual; ask it for a report any time. The steps are in `knowledge/skills/dispatch.md`, so any harness with subagents can follow them. If something looks wrong, run `siding doctor`.
 
 ### Adopting an existing workspace
 
@@ -97,7 +97,7 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track review: uncommitted vs committed changes per file, commit list with each commit's diff, docs, gate buttons, Inbox and Health |
 | `siding review <task>` | Deep-review a finished task on the latest base: report first, then fix through the gates |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
-| `siding adapter install <agents\|claude\|codex\|cursor\|opencode>` | Set up required tools and skills, write harness files into tracks |
+| `siding adapter install <agents\|claude\|codex\|cursor\|opencode>` | Set up required tools and skills, write harness files into tracks (`claude` also adds `/dispatch` and the guard to the workspace root) |
 | `siding learn` | Review `knowledge/inbox/` one proposal at a time: accept, edit, skip or delete |
 | `siding doctor` | Check required tools, skills and plugins, config, missing or orphaned worktrees, stale facts |
 | `siding version` | Print the version |
