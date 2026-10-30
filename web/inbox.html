@@ -7,14 +7,15 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header><h1><a href="/">siding</a> / Inbox</h1><span>{{len .Props}} proposal(s)</span></header>
-<div class="detail">
+{{template "top"}}
+<div class="page">
+<h1>Inbox <span class="sub">{{len .Props}}</span></h1>
 {{with .Error}}<p class="err" role="alert">{{.}}</p>{{end}}
 {{with .Done}}<p class="ok" role="status">{{.}}</p>{{end}}
 {{range .Props}}
 <article class="card">
   <div class="task">{{.Repo}}</div>
-  <div class="stage">{{.File}} · {{.Track}} · {{.Date}} · commit <code>{{.Commit}}</code></div>
+  <div class="sub">{{.File}} · {{.Track}} · {{.Date}} · <code>{{.Commit}}</code></div>
   <form method="post" action="/inbox/{{.File}}/accept">
     <input type="hidden" name="token" value="{{$.Token}}">
     <label for="b-{{.File}}" class="empty">Edit before accepting if needed</label>

@@ -7,10 +7,11 @@
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header><h1><a href="/">siding</a> / Health</h1><span>same checks as <code>siding doctor</code></span></header>
-<div class="detail">
+{{template "top"}}
+<div class="page">
+<h1>Health <span class="sub">same checks as <code>siding doctor</code></span></h1>
 {{range .}}
-<p><strong class="err">{{.Kind}}</strong> {{.Detail}}</p>
+<p class="card"><strong class="err">{{.Kind}}</strong> {{.Detail}}</p>
 {{else}}<p class="ok">All checks pass.</p>{{end}}
 </div>
 </body>

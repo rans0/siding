@@ -6,12 +6,21 @@
 <title>{{.SHA}} · {{.T.Task}} · siding</title>
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-<header><h1><a href="/">siding</a> / <a href="/t/{{.T.Task}}">{{.T.Task}}</a> / {{.Repo}}</h1><span><code>{{.SHA}}</code></span></header>
-<div class="detail">
-<pre class="doc">{{.Msg}}</pre>
-<section><div class="diffhead"><h2>Files</h2><button type="button" class="diff-mode" aria-pressed="false">Split</button></div>{{template "files" .Files}}</section>
+<body class="ide" data-start="diff">
+{{template "top"}}
+<div class="trackbar"><span class="crumb">/ <a href="/t/{{.T.Task}}">{{.T.Task}}</a> / {{.Repo}} / <code>{{.SHA}}</code></span></div>
+<div class="split-pane">
+<nav class="side" aria-label="Files in this commit">
+  <section><h2>Message</h2><button type="button" class="item" data-doc="d-msg" title="Commit message"><span class="name">Commit message</span></button></section>
+  <section><h2>Files</h2>{{template "filelist" .Files}}</section>
+  <p class="keys">j / k next, previous · s split</p>
+</nav>
+<main class="pane">
+  <div class="panehead"><span id="title"></span><button type="button" class="diff-mode" aria-pressed="false" hidden>Split</button></div>
+  <div id="view" class="view"></div>
+</main>
 </div>
-{{template "lazydiff"}}
+<template id="d-msg"><pre class="doc">{{.Msg}}</pre></template>
+{{template "viewer"}}
 </body>
 </html>

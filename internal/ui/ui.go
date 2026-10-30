@@ -34,16 +34,16 @@ type card struct {
 	Repos       []repoCard
 }
 
-type column struct {
+type group struct {
 	Name  string
 	Cards []card
 }
 
-var columnOf = map[string]int{
-	core.StagePRD: 0, core.StageGate1: 0,
-	core.StageBuild: 1,
-	core.StageGate2: 2,
-	core.StageShip:  3,
+// groupOf puts tracks waiting on the user first, then work in progress, then shipped.
+var groupOf = map[string]int{
+	core.StageGate1: 0, core.StageGate2: 0,
+	core.StagePRD: 1, core.StageBuild: 1,
+	core.StageShip: 2,
 }
 
 // diffLine is one row of a rendered diff; Old and New are line numbers, 0 when absent.
@@ -54,10 +54,7 @@ type diffLine struct {
 
 type commit struct{ SHA, Subject string }
 
-// Files whose line counts are under this start open; their diffs load as the page opens.
-const maxOpenLines = 400
-
-// fileList is one scope's files; each diff loads from Src when its block opens.
+// fileList is one scope's files; the viewer loads each diff from Src when picked.
 type fileList struct {
 	Src    string // diff url without path: /t/{task}/{repo}/diff?scope=...
 	Files  []core.FileChange
@@ -65,9 +62,15 @@ type fileList struct {
 	Err    error
 }
 
-func (l fileList) Open(f core.FileChange) bool {
-	return !f.New && !f.Binary && f.Add+f.Del <= maxOpenLines
+// Dir and Base split a path for the sidebar, which dims the directory.
+func (l fileList) Dir(f core.FileChange) string {
+	if i := strings.LastIndexByte(f.Path, '/'); i >= 0 {
+		return f.Path[:i+1]
+	}
+	return ""
 }
+
+func (l fileList) Base(f core.FileChange) string { return f.Path[strings.LastIndexByte(f.Path, '/')+1:] }
 
 // URL of one file's diff, path query-escaped so names like "a&b" survive.
 func (l fileList) URL(f core.FileChange) string { return l.Src + "&path=" + url.QueryEscape(f.Path) }
@@ -103,7 +106,7 @@ func Handler(w *core.Workspace) http.Handler {
 			http.Error(rw, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		cols := []column{{Name: "PRD"}, {Name: "Build"}, {Name: "Review"}, {Name: "Done"}}
+		groups := []group{{Name: "Waiting on you"}, {Name: "In progress"}, {Name: "Shipped"}}
 		for _, t := range tracks {
 			c := card{Task: t.Task, Stage: core.StageLabel[t.Status], Hotfix: t.Hotfix, Gate: atGate(t)}
 			for _, s := range w.State(t) {
@@ -112,13 +115,14 @@ func Handler(w *core.Workspace) http.Handler {
 				case s.Err != nil:
 					rc = repoCard{Name: s.Name, Summary: "error"}
 				case s.Changed > 0 || s.Ahead > 0 || s.Behind > 0:
-					rc = repoCard{Name: s.Name, Summary: fmt.Sprintf("%d changed +%d -%d", s.Changed, s.Ahead, s.Behind)}
+					rc = repoCard{Name: s.Name, Summary: fmt.Sprintf("%d changed · ↑%d ↓%d", s.Changed, s.Ahead, s.Behind)}
 				}
 				c.Repos = append(c.Repos, rc)
 			}
-			cols[columnOf[t.Status]].Cards = append(cols[columnOf[t.Status]].Cards, c)
+			groups[groupOf[t.Status]].Cards = append(groups[groupOf[t.Status]].Cards, c)
 		}
-		render(rw, "board.html", map[string]any{"Root": w.Root, "Columns": cols})
+		props, _ := w.Inbox()
+		render(rw, "board.html", map[string]any{"Root": w.Root, "Groups": groups, "Empty": len(tracks) == 0, "Inbox": len(props)})
 	})
 	mux.HandleFunc("GET /t/{task}", func(rw http.ResponseWriter, r *http.Request) {
 		t, err := w.LoadTrack(r.PathValue("task"))

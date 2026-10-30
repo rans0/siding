@@ -94,7 +94,7 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding pr <task> [--push-only]` | After Gate 2: commit, push and open a PR per repo with `gh`; title and body from `prd.md`. `--push-only` stops after the push and needs no `gh` |
 | `siding next <task>` | After the PR merges: start the next cycle on the same branches; the cycle's prd/plan/testing move to a numbered docs folder |
 | `siding completion zsh\|bash` | Tab completion with descriptions: commands, task names with their stage, repos, flags. brew installs it (zsh needs `autoload -Uz compinit && compinit` in `~/.zshrc`); otherwise add `source <(siding completion zsh)` after `compinit`, or `eval "$(siding completion bash)"` for bash |
-| `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks by stage, per-track review: uncommitted vs committed changes per file, commit list with each commit's diff, docs, gate buttons, Inbox and Health |
+| `siding ui [--port N]` | Board on `127.0.0.1` (default port 4747): tracks waiting on you first; per-track review in an editor-style layout (sidebar of docs, uncommitted and committed files and commits; one pane with the doc or diff, unified or split; `j`/`k` to move, `s` to split), gate buttons, Inbox and Health |
 | `siding review <task>` | Deep-review a finished task on the latest base: report first, then fix through the gates |
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
 | `siding adapter install <agents\|claude\|codex\|cursor\|opencode>` | Set up required tools and skills, write harness files into tracks (`claude` also adds `/dispatch` and the guard to the workspace root) |
@@ -111,7 +111,7 @@ Safety behaviors:
 
 Stages: `prd` → `GATE 1` → `build` → `GATE 2` → `ship`. The agent runs `siding submit` at each gate and stops; you run `siding approve`. In Claude Code, Codex, Cursor and OpenCode a hook blocks the agent from running `siding approve` itself, and ponytail is enabled only in the build and review stages (applies from the next session).
 
-The board keeps no state of its own and binds to `127.0.0.1` only. Gate buttons call the same code as `siding approve`, protected by a per-server token. The track page is for review only: per-file diffs with line numbers, commits and docs; the agent stays in your terminal.
+The board keeps no state of its own and binds to `127.0.0.1` only. Gate buttons call the same code as `siding approve`, protected by a per-server token. The track page is for review only; the agent stays in your terminal. At Gate 2 it opens on the first changed file, otherwise on `prd.md`.
 
 `siding open` runs the agent in a pseudo-terminal owned by siding, so it works in any terminal app (Terminal, iTerm2, a VS Code panel) with no tmux. Run `siding open` again from another terminal to attach to the same session. The session ends when the agent exits or the terminal that started it closes. On Windows the agent runs directly in the terminal.
 

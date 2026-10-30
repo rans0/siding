@@ -4,28 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="5">
-<title>siding board</title>
+<title>siding</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header><h1>siding</h1><span>{{.Root}}</span><nav><a href="/inbox">Inbox</a> <a href="/health">Health</a></nav></header>
-<main>
-{{range .Columns}}
+{{template "top"}}
+<div class="page">
+<p class="sub root">{{.Root}}{{with .Inbox}} · <a href="/inbox">{{.}} lesson(s) in inbox</a>{{end}}</p>
+{{if not .Empty}}{{range .Groups}}{{if .Cards}}
 <section aria-label="{{.Name}}">
-  <h2>{{.Name}} ({{len .Cards}})</h2>
+  <h2>{{.Name}} <span class="sub">{{len .Cards}}</span></h2>
+  <ul class="rows">
   {{range .Cards}}
-  <article class="card{{if .Gate}} gate{{end}}">
-    <a href="/t/{{.Task}}"><div class="task">{{.Task}}{{if .Hotfix}} · hotfix{{end}}</div></a>
-    <div class="stage">{{.Stage}}</div>
-    <ul>
-    {{range .Repos}}
-      <li><code>{{.Name}}</code><span{{if .Clean}} class="clean"{{end}}>{{.Summary}}</span></li>
-    {{end}}
-    </ul>
-  </article>
-  {{else}}<p class="empty">none</p>{{end}}
+  <li><a class="row{{if .Gate}} gate{{end}}" href="/t/{{.Task}}">
+    <span class="task">{{.Task}}{{if .Hotfix}} <span class="pill">hotfix</span>{{end}}</span>
+    <span class="pill{{if .Gate}} gate{{end}}">{{.Stage}}</span>
+    <span class="repos">{{range .Repos}}<span><code>{{.Name}}</code> <span class="{{if .Clean}}sub{{else}}chg{{end}}">{{.Summary}}</span></span>{{end}}</span>
+  </a></li>
+  {{end}}
+  </ul>
 </section>
-{{end}}
-</main>
+{{end}}{{end}}{{else}}<p class="empty">No tracks. Start one with <code>siding new &lt;task&gt; &lt;repos&gt;</code>.</p>{{end}}
+</div>
 </body>
 </html>

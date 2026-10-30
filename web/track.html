@@ -6,66 +6,35 @@
 <title>{{.T.Task}} · siding</title>
 <link rel="stylesheet" href="/style.css">
 </head>
-<body>
-<header><h1><a href="/">siding</a> / {{.T.Task}}</h1><span>{{.Stage}}</span></header>
-<div class="detail wide">
-{{with .Error}}<p class="err" role="alert">{{.}}</p>{{end}}
-{{if .AtGate}}
-<section class="gatebar" aria-label="Gate decision">
-  <strong>{{.Stage}}</strong>
-  <form method="post" action="/t/{{.T.Task}}/approve"><input type="hidden" name="token" value="{{.Token}}"><button class="primary">Approve</button></form>
-  <form method="post" action="/t/{{.T.Task}}/back"><input type="hidden" name="token" value="{{.Token}}"><button>Send back</button></form>
-</section>
-{{end}}
-
-<section class="review">
-  <nav class="filenav" aria-label="Changed files"><h2>Files</h2><ol id="filenav"></ol></nav>
-  <div>
-  <div class="diffhead"><h2>Changes</h2><button type="button" class="diff-mode" aria-pressed="false">Split</button></div>
+<body class="ide" data-start="{{if eq .T.Status "gate2"}}diff{{else}}prd.md{{end}}">
+{{template "top"}}
+<div class="trackbar"><span class="crumb">/ {{.T.Task}}</span><span class="pill{{if .AtGate}} gate{{end}}">{{.Stage}}</span>
+{{if .AtGate}}<span class="spacer"></span>
+<form method="post" action="/t/{{.T.Task}}/back"><input type="hidden" name="token" value="{{.Token}}"><button>Send back</button></form>
+<form method="post" action="/t/{{.T.Task}}/approve"><input type="hidden" name="token" value="{{.Token}}"><button class="primary">Approve</button></form>{{end}}</div>
+{{with .Error}}<p class="err banner" role="alert">{{.}}</p>{{end}}
+<div class="split-pane">
+<nav class="side" aria-label="Review items">
+  <section><h2>Docs</h2>
+  <ul>{{range .Docs}}<li><button type="button" class="item" data-doc="d-{{.Name}}">{{.Name}}</button></li>{{else}}<li class="empty">No docs yet.</li>{{end}}</ul>
+  </section>
   {{range .Reports}}
-  <details open>
-    <summary>{{.R.Name}} · <code>{{.R.Branch}}</code> from <code>{{.R.Base}}</code> · {{len .R.Commits}} commit(s)</summary>
+  <section><h2>{{.R.Name}} <span class="sub">{{.R.Branch}} ← {{.R.Base}}</span></h2>
     {{with .R.Err}}<p class="err">{{.}}</p>{{end}}
-    {{if .Commits}}<ul class="commits">{{$repo := .R.Name}}{{range .Commits}}<li><a href="/t/{{$.T.Task}}/{{$repo}}/{{.SHA}}"><code>{{.SHA}}</code></a> {{.Subject}}</li>{{end}}</ul>{{end}}
-    {{if or .Uncommitted.Files .Uncommitted.Err}}<details open data-group="{{.R.Name}} · uncommitted"><summary>Uncommitted</summary>{{template "files" .Uncommitted}}</details>{{end}}
-    {{if or .Committed.Files .Committed.Err}}<details data-group="{{.R.Name}} · committed"><summary>Committed</summary>{{template "files" .Committed}}</details>{{end}}
+    {{if or .Uncommitted.Files .Uncommitted.Err}}<h3>Uncommitted</h3>{{template "filelist" .Uncommitted}}{{end}}
+    {{if or .Committed.Files .Committed.Err}}<h3>Committed</h3>{{template "filelist" .Committed}}{{end}}
+    {{if .Commits}}<h3>Commits</h3><ul>{{$repo := .R.Name}}{{range .Commits}}<li><a class="item" href="/t/{{$.T.Task}}/{{$repo}}/{{.SHA}}"><code class="sub">{{.SHA}}</code> <span class="name">{{.Subject}}</span></a></li>{{end}}</ul>{{end}}
     {{if not (or .Uncommitted.Files .Committed.Files)}}<p class="empty">No changes.</p>{{end}}
-  </details>
+  </section>
   {{end}}
-  </div>
-</section>
-
-<section>
-  <h2>Docs</h2>
-  {{range .Docs}}
-  <details{{if eq .Name "prd.md"}} open{{end}}><summary>{{.Name}}</summary><pre class="doc">{{.Body}}</pre></details>
-  {{else}}<p class="empty">No docs yet in <code>{{.T.Docs}}</code>.</p>{{end}}
-</section>
+  <p class="keys">j / k next, previous · s split</p>
+</nav>
+<main class="pane">
+  <div class="panehead"><span id="title"></span><button type="button" class="diff-mode" aria-pressed="false" hidden>Split</button></div>
+  <div id="view" class="view"></div>
+</main>
 </div>
-{{template "lazydiff"}}
-<script>
-// Builds the file list from the file blocks; a click opens the block and its parents.
-(() => {
-  const nav = document.getElementById("filenav")
-  let group
-  document.querySelectorAll("details.file").forEach((d, i) => {
-    d.id = "f" + i
-    const g = d.closest("[data-group]")?.dataset.group || ""
-    if (g && g !== group) {
-      group = g
-      const h = document.createElement("li"); h.className = "group"; h.textContent = g; nav.append(h)
-    }
-    const a = document.createElement("a")
-    a.href = "#" + d.id
-    a.title = d.querySelector("summary code").textContent
-    a.textContent = a.title.split("/").pop()
-    const li = document.createElement("li")
-    li.append(a, ...[...d.querySelectorAll("summary span")].map((s) => s.cloneNode(true)))
-    nav.append(li)
-    a.onclick = () => { for (let p = d; p; p = p.parentElement.closest("details")) p.open = true }
-  })
-  if (!nav.children.length) nav.closest("nav").hidden = true
-})()
-</script>
+{{range .Docs}}<template id="d-{{.Name}}"><pre class="doc">{{.Body}}</pre></template>{{end}}
+{{template "viewer"}}
 </body>
 </html>

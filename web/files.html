@@ -1,52 +1,78 @@
-{{/* files: a fileList. Each block fetches its diff from data-src the first time it opens. */}}
-{{define "files"}}{{with .Err}}<p class="err">{{.}}</p>{{end}}{{$l := .}}{{range .Files}}<details class="file" data-src="{{$l.URL .}}"{{if $l.Open .}} open{{end}}>
-<summary><code>{{.Path}}</code> {{if .New}}<span class="add">new</span>{{else if .Binary}}<span class="hunk">binary</span>{{else}}<span class="add">+{{.Add}}</span> <span class="del">-{{.Del}}</span>{{end}}</summary><div class="diff"><p class="empty">Loading…</p></div></details>
-{{end}}{{with .Hidden}}<p class="empty">{{.}} more untracked file(s) not listed.</p>{{end}}{{end}}
+{{/* filelist: a fileList as sidebar items. The viewer fetches each diff from data-src when picked. */}}
+{{define "filelist"}}{{with .Err}}<p class="err">{{.}}</p>{{end}}{{$l := .}}<ul>{{range .Files}}<li><button type="button" class="item" data-src="{{$l.URL .}}" title="{{.Path}}"><span class="name"><span class="dir">{{$l.Dir .}}</span>{{$l.Base .}}</span>{{if .New}}<span class="add">new</span>{{else if .Binary}}<span class="sub">bin</span>{{else}}<span class="add">+{{.Add}}</span><span class="del">-{{.Del}}</span>{{end}}</button></li>
+{{end}}</ul>{{with .Hidden}}<p class="empty">{{.}} more untracked file(s) not listed.</p>{{end}}{{end}}
 
 {{define "diff"}}{{if .Lines}}<table class="diff-t u">{{range .Lines}}{{if eq .Class "hunk"}}<tr class="hunk"><td class="ln" colspan="2"></td><td>{{.Text}}</td></tr>
 {{else}}<tr{{with .Class}} class="{{.}}"{{end}}><td class="ln">{{with .Old}}{{.}}{{end}}</td><td class="ln">{{with .New}}{{.}}{{end}}</td><td>{{.Text}}</td></tr>
-{{end}}{{end}}</table>{{else}}<p class="empty">No line changes (mode or empty file).</p>{{end}}{{if .Cut}}<p class="empty">Cut at 1 MiB. Run <code>git diff</code> in the worktree for the rest.</p>{{end}}{{end}}
+{{end}}{{end}}</table>{{else}}<p class="empty pad">No line changes (mode or empty file).</p>{{end}}{{if .Cut}}<p class="empty pad">Cut at 1 MiB. Run <code>git diff</code> in the worktree for the rest.</p>{{end}}{{end}}
 
-{{define "lazydiff"}}<script>
+{{define "top"}}<header class="top"><a href="/" class="brand">siding</a><nav><a href="/">Tracks</a><a href="/inbox">Inbox</a><a href="/health">Health</a></nav></header>{{end}}
+
+{{/* viewer: the sidebar picks one item (.item) and the pane shows it: a file diff from
+data-src, or a doc from the <template> named by data-doc. j/k move between items. */}}
+{{define "viewer"}}<script>
 (() => {
+  const items = [...document.querySelectorAll(".side .item")]
+  const view = document.getElementById("view"), title = document.getElementById("title"), mode = document.querySelector(".diff-mode")
+  const cache = {}
   // split rebuilds a unified table side by side: each run of removed lines pairs with
   // the added run that follows it; context goes on both sides, hunk headers span both.
   const split = (u) => {
     const t = document.createElement("table"); t.className = "diff-t s"
     t.innerHTML = '<colgroup><col class="ln"><col><col class="ln"><col></colgroup>'
-    const cell = (tag, cls, text) => { const c = document.createElement(tag); if (cls) c.className = cls; c.textContent = text; return c }
+    const cell = (cls, text) => { const c = document.createElement("td"); if (cls) c.className = cls; c.textContent = text; return c }
     const side = (r) => r
-      ? [cell("td", "ln", r.cells[r.cells[0].textContent ? 0 : 1].textContent), cell("td", r.className, r.cells[2].textContent.slice(1))]
-      : [cell("td", "ln", ""), cell("td", "none", "")]
+      ? [cell("ln", r.cells[r.cells[0].textContent ? 0 : 1].textContent), cell(r.className, r.cells[2].textContent.slice(1))]
+      : [cell("ln", ""), cell("none", "")]
     const rows = [...u.rows]
     for (let i = 0; i < rows.length;) {
       const r = rows[i]
-      if (r.className === "hunk") { const tr = t.insertRow(); tr.className = "hunk"; tr.append(cell("td", "ln", ""), Object.assign(cell("td", "", r.cells[1].textContent), { colSpan: 3 })); i++; continue }
-      if (r.className !== "del" && r.className !== "add") { const tr = t.insertRow(); tr.append(...side(r), cell("td", "ln", r.cells[1].textContent), cell("td", "", r.cells[2].textContent.slice(1))); i++; continue }
+      if (r.className === "hunk") { const tr = t.insertRow(); tr.className = "hunk"; tr.append(cell("ln", ""), Object.assign(cell("", r.cells[1].textContent), { colSpan: 3 })); i++; continue }
+      if (r.className !== "del" && r.className !== "add") { t.insertRow().append(...side(r), cell("ln", r.cells[1].textContent), cell("", r.cells[2].textContent.slice(1))); i++; continue }
       const dels = [], adds = []
       while (rows[i]?.className === "del") dels.push(rows[i++])
       while (rows[i]?.className === "add") adds.push(rows[i++])
-      for (let k = 0; k < Math.max(dels.length, adds.length); k++) { const tr = t.insertRow(); tr.append(...side(dels[k]), ...side(adds[k])) }
+      for (let k = 0; k < Math.max(dels.length, adds.length); k++) t.insertRow().append(...side(dels[k]), ...side(adds[k]))
     }
     return t
   }
-  const mode = document.querySelector(".diff-mode")
-  if (mode) {
-    const set = (on) => { document.body.classList.toggle("split", on); mode.setAttribute("aria-pressed", on); mode.textContent = on ? "Unified" : "Split" }
-    try { set(localStorage.getItem("siding.split") === "1") } catch {}
-    mode.onclick = () => { const on = !document.body.classList.contains("split"); set(on); try { localStorage.setItem("siding.split", on ? "1" : "0") } catch {} }
-  }
-  const load = (d) => {
-    if (!d.open || d.dataset.loaded) return
-    d.dataset.loaded = 1
-    const body = d.querySelector(".diff")
-    fetch(d.dataset.src).then(async (r) => {
+  const fail = (msg) => { const p = document.createElement("p"); p.className = "err pad"; p.textContent = msg; view.replaceChildren(p) }
+  const show = (i) => {
+    const it = items[i]
+    if (!it) return
+    items.forEach((x) => x.removeAttribute("aria-current"))
+    it.setAttribute("aria-current", "true")
+    it.scrollIntoView({ block: "nearest" })
+    history.replaceState(null, "", "#" + i)
+    title.textContent = it.title || it.textContent
+    mode.hidden = !it.dataset.src
+    view.scrollTop = 0
+    if (it.dataset.doc) return view.replaceChildren(document.getElementById(it.dataset.doc).content.cloneNode(true))
+    if (cache[it.dataset.src]) return view.replaceChildren(...cache[it.dataset.src])
+    view.innerHTML = '<p class="empty pad">Loading…</p>'
+    fetch(it.dataset.src).then(async (r) => {
       if (!r.ok) throw new Error(await r.text())
-      body.innerHTML = await r.text()
-      const u = body.querySelector("table.u")
+      const box = document.createElement("div"); box.innerHTML = await r.text()
+      const u = box.querySelector("table.u")
       if (u) u.after(split(u))
-    }).catch((e) => { body.innerHTML = ""; const p = document.createElement("p"); p.className = "err"; p.textContent = e.message; body.append(p); delete d.dataset.loaded })
+      cache[it.dataset.src] = [...box.childNodes]
+      if (it.getAttribute("aria-current")) view.replaceChildren(...box.childNodes)
+    }).catch((e) => fail(e.message))
   }
-  document.querySelectorAll("details.file").forEach((d) => { d.addEventListener("toggle", () => load(d)); load(d) })
+  items.forEach((it, i) => it.addEventListener("click", () => show(i)))
+  const cur = () => items.findIndex((x) => x.getAttribute("aria-current"))
+  addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA/.test(e.target.tagName)) return
+    if (e.key === "j") show(Math.min(cur() + 1, items.length - 1))
+    else if (e.key === "k") show(Math.max(cur() - 1, 0))
+    else if (e.key === "s") mode.click()
+  })
+  const set = (on) => { document.body.classList.toggle("split", on); mode.setAttribute("aria-pressed", on); mode.textContent = on ? "Unified" : "Split" }
+  try { set(localStorage.getItem("siding.split") === "1") } catch {}
+  mode.onclick = () => { const on = !document.body.classList.contains("split"); set(on); try { localStorage.setItem("siding.split", on ? "1" : "0") } catch {} }
+  const want = document.body.dataset.start
+  const start = items.findIndex((x) => want === "diff" ? x.dataset.src : x.dataset.doc === "d-" + want)
+  show(+location.hash.slice(1) < items.length && location.hash ? +location.hash.slice(1) : Math.max(start, 0))
+  if (!items.length) title.textContent = "Nothing to review yet"
 })()
 </script>{{end}}

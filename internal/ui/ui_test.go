@@ -28,7 +28,7 @@ func TestBoard(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "http://127.0.0.1:4747/", nil))
 	body := rec.Body.String()
-	if rec.Code != 200 || !strings.Contains(body, "promo") || !strings.Contains(body, `card gate`) {
+	if rec.Code != 200 || !strings.Contains(body, "promo") || !strings.Contains(body, `row gate`) {
 		t.Fatalf("code %d, body:\n%s", rec.Code, body)
 	}
 
@@ -140,13 +140,13 @@ func serve(h http.Handler, path string) (int, string) {
 	return rec.Code, html.UnescapeString(rec.Body.String())
 }
 
-// src returns the lazy-load url of the first file block after marker in page.
+// src returns the diff url of the first file item after marker in page.
 func src(t *testing.T, page, marker string) string {
 	t.Helper()
 	i := strings.Index(page, marker)
 	j := strings.Index(page[max(i, 0):], `data-src="`)
 	if i < 0 || j < 0 {
-		t.Fatalf("no %s file block:\n%s", marker, page)
+		t.Fatalf("no %s file item:\n%s", marker, page)
 	}
 	rest := page[i+j+len(`data-src="`):]
 	return rest[:strings.IndexByte(rest, '"')]
@@ -159,14 +159,14 @@ func TestTrackChanges(t *testing.T) {
 	if code != 200 || strings.Contains(page, "+wip") {
 		t.Fatalf("diff should load lazily, code %d:\n%s", code, page)
 	}
-	for marker, want := range map[string]string{">Uncommitted<": "+wip", ">Committed<": "+committed"} {
+	for marker, want := range map[string]string{"<h3>Uncommitted</h3>": "+wip", "<h3>Committed</h3>": "+committed"} {
 		u := src(t, page, marker)
 		if code, frag := serve(h, u); code != 200 || !strings.Contains(frag, want) {
 			t.Errorf("%s %s: %d\n%s", marker, u, code, frag)
 		}
 	}
-	// the block's data-src is the last one before its name
-	odd := page[:strings.Index(page, "<code>x & y.txt")]
+	// the item's data-src comes right before its title
+	odd := page[:strings.Index(page, `title="x & y.txt"`)]
 	odd = odd[strings.LastIndex(odd, `data-src="`)+len(`data-src="`):]
 	if _, frag := serve(h, odd[:strings.IndexByte(odd, '"')]); !strings.Contains(frag, "+odd name") {
 		t.Errorf("odd file name not escaped in url:\n%s", frag)
@@ -186,7 +186,7 @@ func TestCommitPage(t *testing.T) {
 	if code != 200 || !strings.Contains(page, "add feature") {
 		t.Fatalf("commit page %d:\n%s", code, page)
 	}
-	if _, frag := serve(h, src(t, page, "<section>")); !strings.Contains(frag, "+committed") || strings.Contains(frag, "+wip") {
+	if _, frag := serve(h, src(t, page, "<h2>Files</h2>")); !strings.Contains(frag, "+committed") || strings.Contains(frag, "+wip") {
 		t.Errorf("commit file diff:\n%s", frag)
 	}
 	if code, _ := serve(h, "/t/feat/app/HEAD"); code != 404 {
