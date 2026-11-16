@@ -112,6 +112,13 @@ func Init(dir string) error {
 	if err := os.CopyFS(filepath.Join(dir, "templates"), docTemplates); err != nil {
 		return err
 	}
+	// Baseline for `siding update`: what was shipped, so later edits of yours are kept.
+	for _, src := range starterSources {
+		sub, _ := fs.Sub(siding.Assets, src.asset)
+		if err := os.CopyFS(filepath.Join(dir, ".siding", "starter", src.dest), sub); err != nil {
+			return err
+		}
+	}
 	tmpl, _ := siding.Assets.ReadFile("templates/siding.toml")
 	files := map[string]string{
 		configFile:                 string(tmpl),

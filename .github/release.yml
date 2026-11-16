@@ -1,0 +1,11 @@
+# Groups for GitHub's generated release notes (goreleaser changelog.use: github-native).
+changelog:
+  categories:
+    - title: Features
+      labels: [enhancement, feature]
+    - title: Fixes
+      labels: [bug, fix]
+    - title: Docs and site
+      labels: [documentation, docs]
+    - title: Other changes
+      labels: ["*"]

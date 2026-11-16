@@ -39,6 +39,7 @@ const usage = `siding: multi-repo, multi-task workspace manager for coding agent
   siding adapter install <harness>           agents|claude|codex|cursor|opencode: tools, skills, harness files
   siding learn                               review knowledge/inbox: accept, edit, skip, delete
   siding doctor                              check tools, skills, config, worktrees, stale facts
+  siding update                              bring starter skills, rules and doc templates up to this version
   siding completion zsh|bash                 print shell completion: source <(siding completion zsh)
   siding version                             print the version
 `
@@ -396,6 +397,24 @@ func run(args []string) error {
 	case "learn":
 		return learn(w)
 
+	case "update":
+		res, err := w.Update()
+		edited := 0
+		for _, r := range res {
+			fmt.Printf("%-14s %s\n", r.Action, r.Path)
+			if r.Action == core.UpdateEdited {
+				edited++
+			}
+		}
+		if err != nil {
+			return err
+		}
+		if edited > 0 {
+			fmt.Printf("\n%d file(s) you edited were kept. New versions are in .siding/starter/new/; merge by hand, e.g.\n  diff %s .siding/starter/new/%s\n", edited, firstEdited(res), firstEdited(res))
+		}
+		fmt.Printf("updated: %d file(s) changed, every track's AGENTS.md regenerated\n", len(res)-edited)
+		return nil
+
 	case "doctor":
 		problems := w.Doctor()
 		for _, p := range problems {
@@ -462,4 +481,13 @@ func learn(w *core.Workspace) error {
 		}
 	}
 	return nil
+}
+
+func firstEdited(res []core.UpdateResult) string {
+	for _, r := range res {
+		if r.Action == core.UpdateEdited {
+			return r.Path
+		}
+	}
+	return ""
 }

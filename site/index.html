@@ -602,7 +602,7 @@ env_ports = ["PORT=8080", "DB_PORT=5432"]
 branch_prefix = "rans"         <span class="cmt"># branches become rans/&lt;task&gt;</span>
 ref_only = ["docs-site"]
 agent = "claude"               <span class="cmt"># what `siding open` starts</span></pre>
-      <p class="note">Required tools and skills are pinned under <code>[required.*]</code> and fetched by <code>siding adapter install</code>. <code>siding new</code> refuses while any is missing.</p>
+      <p class="note">Required tools and skills are pinned under <code>[required.*]</code> (tag, branch or commit SHA) and fetched by <code>siding adapter install</code>. <code>siding new</code> refuses while any is missing. A skill with <code>when</code>, like a redesign skill, loads only for tasks whose PRD matches.</p>
     </div>
 
     <div class="tabpanel" role="tabpanel" id="t-harness" aria-labelledby="tab-harness" hidden>
@@ -619,6 +619,7 @@ agent = "claude"               <span class="cmt"># what `siding open` starts</sp
       <a class="btn" href="https://github.com/rans0/siding#readme">Full README</a>
       <a class="btn ghost" href="https://github.com/rans0/siding/releases">Releases</a>
     </div>
+    <p class="note" id="latest" hidden></p>
   </div>
 </section>
 
@@ -715,15 +716,15 @@ const steps = [
   { s: "1", t: "Start", who: "you", text: "Create a track: one worktree per repo on a shared branch, setup commands run, AGENTS.md written. Then start the agent inside it.",
     files: "tracks/add-promo/{backend,web}<br>tracks/add-promo/AGENTS.md",
     term: ["$ siding new add-promo backend,web", "# worktrees on rans/add-promo, base recorded in .track.json", "$ siding open add-promo", "# agent starts here"] },
-  { s: "2", t: "PRD", who: "agent", text: "The agent reads AGENTS.md, loads the prd skill and writes the product requirements. Then it submits and stops.",
+  { s: "2", t: "PRD", who: "agent", text: "The agent reads AGENTS.md, loads the prd skill and asks you questions one at a time until the design is settled. Then it writes the product requirements, submits and stops.",
     files: "docs/2026-10-18_add-promo/prd.md",
     term: ["# agent writes prd.md", "$ siding submit add-promo", "# stage: prd → GATE 1. agent stops."] },
   { s: "G1", gate: 1, t: "Gate 1", who: "you", text: "Read the PRD on the board or in your editor. Approve to continue, or send it back and tell the agent what to change.",
     files: "board: http://127.0.0.1:4747",
     term: ["$ siding approve add-promo", "# GATE 1 → build", "", "$ siding approve add-promo --back", "# or: back to prd, with your notes"] },
-  { s: "3", t: "Build", who: "agent", text: "The agent plans, writes tests and code in the worktrees, and leaves every change uncommitted for you to review.",
+  { s: "3", t: "Build", who: "agent", text: "The agent plans vertical slices, writes tests and code in the worktrees, then reviews its diff with fresh context against checklists for each repo's stack, plus security and database. Every change stays uncommitted for you to review.",
     files: "plan.md · testing.md<br>tracks/add-promo/backend/…<br>tracks/add-promo/web/…",
-    term: ["# agent: plan → tests → code", "$ siding submit add-promo", "# stage: build → GATE 2. agent stops."] },
+    term: ["# agent: plan → tests → code → review", "$ siding submit add-promo", "# stage: build → GATE 2. agent stops."] },
   { s: "G2", gate: 1, t: "Gate 2", who: "you", text: "Review the diff on the board, file by file, uncommitted vs committed. Or get the base, commits and diffstat per repo in the terminal.",
     files: "board: per-file diff, commits, docs",
     term: ["$ siding report add-promo", "# base, commits since base, diffstat per repo", "$ siding approve add-promo", "# GATE 2 → ship"] },
@@ -812,6 +813,7 @@ const cmds = [
   ["siding done <task> [--force]", "Remove the track's worktrees once log.md exists; task docs are kept"],
   ["siding adapter install <agents|claude|codex|cursor|opencode>", "Set up required tools and skills, write harness files into tracks"],
   ["siding learn", "Review knowledge/inbox/ one proposal at a time: accept, edit, skip or delete"],
+  ["siding update", "After upgrading: new and changed starter skills, rules and templates; your edits are kept"],
   ["siding doctor", "Check tools, skills, plugins, config, missing or orphaned worktrees, stale facts"],
   ["siding completion zsh|bash", "Tab completion with descriptions: commands, tasks with stage, repos, flags"],
   ["siding version", "Print the version"],
@@ -826,6 +828,17 @@ $("filter").addEventListener("input", e => {
 // reveal on scroll
 const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && (e.target.classList.add("in"), io.unobserve(e.target))), { threshold: .15 });
 document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+// latest release, read from GitHub so the page never needs a manual version bump
+fetch("https://api.github.com/repos/rans0/siding/releases/latest")
+  .then(r => r.ok ? r.json() : Promise.reject())
+  .then(r => {
+    const el = document.getElementById("latest"), a = document.createElement("a");
+    a.href = r.html_url; a.textContent = r.tag_name + " changelog";
+    el.append("Latest release: ", a, " · " + new Date(r.published_at).toISOString().slice(0, 10));
+    el.hidden = false;
+  })
+  .catch(() => {});
 </script>
 </body>
 </html>

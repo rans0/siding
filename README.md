@@ -23,6 +23,8 @@ scoop bucket add rans0 https://github.com/rans0/scoop-bucket && scoop install si
 go install github.com/rans0/siding/cmd/siding@latest                               # Go 1.25+
 ```
 
+To upgrade: `brew upgrade siding` (or `scoop update siding`), then `siding update` in each workspace. The binary updates the commands; `siding update` brings in new and changed starter skills, rules and doc templates, and keeps any file you edited. Release notes: [Releases](https://github.com/rans0/siding/releases).
+
 ## Quick start
 
 ```
@@ -99,6 +101,7 @@ siding new fix-crash backend --hotfix --from v1.4.2
 | `siding done <task> [--force]` | Remove the track's worktrees once `log.md` exists; task docs are kept |
 | `siding adapter install <agents\|claude\|codex\|cursor\|opencode>` | Set up required tools and skills, write harness files into tracks (`claude` also adds `/dispatch` and the guard to the workspace root) |
 | `siding learn` | Review `knowledge/inbox/` one proposal at a time: accept, edit, skip or delete |
+| `siding update` | After upgrading siding: add and update starter skills, rules and doc templates, keeping files you edited (new versions go to `.siding/starter/new/`), and regenerate every track's `AGENTS.md` |
 | `siding doctor` | Check required tools, skills and plugins, config, missing or orphaned worktrees, stale facts |
 | `siding version` | Print the version |
 
@@ -144,7 +147,8 @@ Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified
 │   ├── repos/<repo>.md    # per-repo facts, included in AGENTS.md
 │   ├── glossary.md        # domain terms, included in every AGENTS.md (created by the first accepted term)
 │   └── inbox/             # lesson proposals from retros
-└── .siding/vendor/        # pinned upstream skills
+├── .siding/vendor/        # pinned upstream skills
+└── .siding/starter/       # starter files as last shipped, so `siding update` can tell your edits apart
 ```
 
 ## Configuration
