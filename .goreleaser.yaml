@@ -24,6 +24,14 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# Release notes from merged PR titles, grouped by GitHub (.github/release.yml), no manual changelog.
+changelog:
+  use: github-native
+
+release:
+  footer: |
+    After upgrading, run `siding update` in each workspace to get new and changed starter skills, rules and doc templates. Files you edited are kept; their new versions go to `.siding/starter/new/`.
+
 # Needs repos rans0/homebrew-tap and rans0/scoop-bucket, and a TAP_TOKEN secret that can push to them.
 homebrew_casks:
   - repository: { owner: rans0, name: homebrew-tap, token: "{{ .Env.TAP_TOKEN }}" }

@@ -22,6 +22,9 @@ func (w *Workspace) Doctor() []Problem {
 	for _, m := range w.MissingRequired() {
 		add("missing", "%s (run `siding adapter install <harness>`)", m)
 	}
+	if n := len(w.StarterOutdated()); n > 0 {
+		add("starter", "%d starter skill, rule or template file(s) are older than this siding (run `siding update`)", n)
+	}
 
 	onDisk := map[string]bool{}
 	if repos, err := w.Repos(); err == nil {
