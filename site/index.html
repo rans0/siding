@@ -452,7 +452,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space
       <div><b>CLI is the core</b><p>Any agent that runs shell commands can use it. Adapters only add conveniences.</p></div>
       <div><b>Plain files</b><p>TOML config. Markdown docs and knowledge. JSON track state. No database, no daemon.</p></div>
       <div><b>Git only</b><p>The single hard dependency. <code>gh</code>, node and agents are optional.</p></div>
-      <div><b>Two human gates</b><p>Agent stops after the PRD, and again with the uncommitted diff.</p></div>
+      <div><b>Two human gates</b><p>Agent grills you, stops after the PRD, and again with the uncommitted diff.</p></div>
     </div>
   </div>
 </header>
@@ -507,7 +507,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space
 ├── docs/2026-10-18_add-promo/
 │   └── prd.md plan.md testing.md log.md
 └── knowledge/
-    ├── rules/  skills/  repos/
+    ├── rules/  skills/  repos/  glossary.md
     └── inbox/           <em># lesson proposals</em></pre>
       <div class="facts reveal">
         <div class="fact"><h3>Main clones untouched</h3><p>Worktrees branch off <code>repos/</code>. A hook blocks edits there. No <code>git checkout</code> between tasks.</p></div>
@@ -546,7 +546,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space
       <ol class="reveal">
         <li><div><b>Retro</b><span>Before <code>done</code>, the agent writes up to <code>retro_max</code> lesson proposals to <code>knowledge/inbox/</code>, one Markdown file each.</span></div></li>
         <li><div><b>Review</b><span><code>siding learn</code> or the board's Inbox: accept, edit, skip or delete, one at a time.</span></div></li>
-        <li><div><b>Store</b><span>Accepted facts land in <code>knowledge/repos/&lt;repo&gt;.md</code> with a verified commit marker. <code>skill:</code> and <code>rule:</code> proposals become skills or rules.</span></div></li>
+        <li><div><b>Store</b><span>Accepted facts land in <code>knowledge/repos/&lt;repo&gt;.md</code> with a verified commit marker. <code>skill:</code>, <code>rule:</code> and <code>glossary</code> proposals become skills, rules or domain terms.</span></div></li>
         <li><div><b>Reuse</b><span>Every later track touching that repo gets the facts in its <code>AGENTS.md</code>. <code>siding doctor</code> flags facts whose paths no longer exist.</span></div></li>
       </ol>
     </div>

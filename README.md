@@ -139,8 +139,9 @@ Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified
 ├── templates/             # starting points for those four docs
 ├── knowledge/
 │   ├── rules/             # always loaded into AGENTS.md
-│   ├── skills/            # loaded per stage: prd, workflow, tdd, review, hotfix, cross-repo, retro, deep-review, adopt
+│   ├── skills/            # loaded per stage: prd, workflow, tdd, diagnose, review, hotfix, cross-repo, retro, deep-review, adopt
 │   ├── repos/<repo>.md    # per-repo facts, included in AGENTS.md
+│   ├── glossary.md        # domain terms, included in every AGENTS.md (created by the first accepted term)
 │   └── inbox/             # lesson proposals from retros
 └── .siding/vendor/        # pinned upstream skills
 ```
