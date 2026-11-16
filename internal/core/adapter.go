@@ -114,7 +114,9 @@ func claudeTrack(w *Workspace, t *Track) error {
 	for _, s := range w.Cfg.Required.Skills {
 		if s.ClaudePlugin != "" {
 			// Claude Code reads this at session start: a stage change applies to the next session.
-			plugins[s.ClaudePlugin] = slices.Contains(s.Stages, skillStage[t.Status])
+			// A `when` skill stays off: its description would auto-trigger it on any task, so the
+			// agent reads its SKILL.md from AGENTS.md only when the PRD matches.
+			plugins[s.ClaudePlugin] = s.When == "" && slices.Contains(s.Stages, skillStage[t.Status])
 		}
 	}
 	settings, _ := json.MarshalIndent(map[string]any{

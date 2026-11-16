@@ -190,7 +190,10 @@ func TestParseFrom(t *testing.T) {
 func TestStages(t *testing.T) {
 	ws := t.TempDir()
 	w := &Workspace{Root: ws, Local: Local{Adapters: []string{"claude"}}}
-	w.Cfg.Required.Skills = map[string]Skill{"ponytail": {Stages: []string{"build", "review"}, ClaudePlugin: "ponytail@ponytail"}}
+	w.Cfg.Required.Skills = map[string]Skill{
+		"ponytail": {Stages: []string{"build", "review"}, ClaudePlugin: "ponytail@ponytail"},
+		"unslop":   {Stages: []string{"build"}, When: "redesign", ClaudePlugin: "unslop@heydamir"},
+	}
 	w.Cfg.Defaults.RetroMax = 5
 	tr := &Track{Task: "s", Docs: "docs/s", Status: StagePRD}
 	os.MkdirAll(filepath.Join(ws, "tracks/s"), 0o755)
@@ -198,12 +201,13 @@ func TestStages(t *testing.T) {
 	if err := w.setStage(tr); err != nil {
 		t.Fatal(err)
 	}
-	plugin := func() bool {
+	enabled := func(name string) bool {
 		var s struct{ EnabledPlugins map[string]bool }
 		b, _ := os.ReadFile(filepath.Join(ws, "tracks/s/.claude/settings.json"))
 		json.Unmarshal(b, &s)
-		return s.EnabledPlugins["ponytail@ponytail"]
+		return s.EnabledPlugins[name]
 	}
+	plugin := func() bool { return enabled("ponytail@ponytail") }
 	step := func(want string, err error) {
 		t.Helper()
 		if err != nil {
@@ -232,6 +236,9 @@ func TestStages(t *testing.T) {
 	step(StageBuild, err)
 	if !plugin() {
 		t.Error("ponytail disabled in build")
+	}
+	if enabled("unslop@heydamir") {
+		t.Error("a `when` skill's plugin enabled in build")
 	}
 	_, err = w.Submit("s")
 	step(StageGate2, err)
@@ -436,5 +443,48 @@ func TestStacks(t *testing.T) {
 	}
 	if want := []string{"review", "review-node", "review-typescript", "review-nextjs", "review-security", "review-database"}; !slices.Equal(names, want) {
 		t.Fatalf("review skills = %v", names)
+	}
+}
+
+// TestSkillWhen: an optional skill is listed with its condition; a SHA ref is fetched and pinned.
+func TestSkillWhen(t *testing.T) {
+	tmp := t.TempDir()
+	up := filepath.Join(tmp, "up")
+	os.MkdirAll(filepath.Join(up, "skills", "unslop"), 0o755)
+	os.WriteFile(filepath.Join(up, "skills", "unslop", "SKILL.md"), []byte("# unslop"), 0o644)
+	gitT(t, up, "init", "-q")
+	gitT(t, up, "add", ".")
+	gitT(t, up, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init")
+	sha := gitT(t, up, "rev-parse", "HEAD")
+
+	ws := filepath.Join(tmp, "ws")
+	if err := Init(ws); err != nil {
+		t.Fatal(err)
+	}
+	w, err := Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Cfg.Required.Skills = map[string]Skill{"unslop": {Source: up, Path: "skills/unslop", Ref: sha, Stages: []string{"build"}, When: "the task redesigns UI"}}
+	if err := w.FetchSkills(); err != nil {
+		t.Fatal(err)
+	}
+	if !w.skillPinned("unslop", w.Cfg.Required.Skills["unslop"]) {
+		t.Fatal("SHA ref not pinned after fetch")
+	}
+	tr := &Track{Task: "t", Docs: "docs/t", Status: StagePRD}
+	os.MkdirAll(w.trackDir("t"), 0o755)
+	if err := w.WriteAgentFiles(tr); err != nil {
+		t.Fatal(err)
+	}
+	agents, _ := os.ReadFile(filepath.Join(w.trackDir("t"), "AGENTS.md"))
+	if !strings.Contains(string(agents), "| build | unslop (*only if* the task redesigns UI) |") {
+		t.Fatalf("AGENTS.md:\n%s", agents)
+	}
+	if !strings.Contains(string(agents), "| build | workflow | `") {
+		t.Fatal("skills without when changed")
+	}
+	if isSHA("v1.2.3") || isSHA("main") || !isSHA(sha) {
+		t.Fatal("isSHA")
 	}
 }
