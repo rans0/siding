@@ -12,7 +12,7 @@ import (
 // Proposal is one lesson in knowledge/inbox/, written by the retro skill.
 type Proposal struct {
 	File   string // base name in knowledge/inbox/
-	Repo   string // repo name, "skill:<name>" for a new skill, or "rule:<name>" for a rule
+	Repo   string // repo name, "skill:<name>" for a new skill, "rule:<name>" for a rule, or "glossary" for a domain term
 	Track  string
 	Date   string
 	Commit string
@@ -75,7 +75,8 @@ func parseProposal(s string) Proposal {
 // non-empty (the "edit" choice). Repo facts are appended to knowledge/repos/<repo>.md with a
 // verified marker; "skill:<name>" becomes knowledge/skills/<name>.md, or is appended to it as a
 // fact when the skill exists; "rule:<name>" is appended
-// to knowledge/rules/<name>.md, which every track's AGENTS.md includes.
+// to knowledge/rules/<name>.md, which every track's AGENTS.md includes; "glossary" is appended
+// to knowledge/glossary.md, also included in every track.
 func (w *Workspace) Accept(file, body string) (string, error) {
 	src, err := w.inboxFile(file)
 	if err != nil {
@@ -108,9 +109,15 @@ func (w *Workspace) Accept(file, body string) (string, error) {
 		}
 		dest = w.path("knowledge", "rules", name+".md")
 		text = fact(p)
+	} else if p.Repo == "glossary" {
+		dest = w.path("knowledge", "glossary.md")
+		text = fact(p)
+		if _, err := os.Stat(dest); err != nil {
+			text = "# Glossary\n\n" + text
+		}
 	} else {
 		if p.Repo == "" {
-			return "", errors.New("proposal has no target: add `repo: <repo>`, `repo: rule:<name>` or `repo: skill:<name>` to its frontmatter")
+			return "", errors.New("proposal has no target: add `repo: <repo>`, `repo: rule:<name>`, `repo: skill:<name>` or `repo: glossary` to its frontmatter")
 		}
 		if err := validName("repo", p.Repo); err != nil {
 			return "", err

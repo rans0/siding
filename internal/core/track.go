@@ -379,6 +379,7 @@ func (w *Workspace) WriteAgentFiles(t *Track) error {
 		RetroMax                int
 		Repos                   []repoView
 		Rules                   []string
+		Glossary                string
 		Skills                  []skillRef
 	}{Task: t.Task, Stage: StageLabel[t.Status], Root: w.Root, Docs: w.path(t.Docs), Hotfix: t.Hotfix, Adopt: t.Adopt, Review: t.Review, RetroMax: w.Cfg.Defaults.RetroMax}
 
@@ -391,6 +392,8 @@ func (w *Workspace) WriteAgentFiles(t *Track) error {
 		b, _ := os.ReadFile(f)
 		data.Rules = append(data.Rules, strings.TrimSpace(string(b)))
 	}
+	glossary, _ := os.ReadFile(w.path("knowledge", "glossary.md"))
+	data.Glossary = strings.TrimSpace(string(glossary))
 	data.Skills = w.skillsFor(t)
 
 	src, _ := siding.Assets.ReadFile("templates/AGENTS.md.tmpl")
@@ -443,6 +446,7 @@ func (w *Workspace) skillsFor(t *Track) []skillRef {
 	add("plan", "prd", k("prd"))
 	add("build", "workflow", k("workflow"))
 	add("build", "tdd", k("tdd"))
+	add("build", "diagnose", k("diagnose"))
 	if len(t.Repos) > 1 {
 		add("build", "cross-repo", k("cross-repo"))
 	}
