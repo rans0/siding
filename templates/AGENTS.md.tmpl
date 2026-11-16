@@ -48,10 +48,10 @@ Use these terms in code, docs and questions; don't invent synonyms.
 {{end}}{{end}}
 ## Skills
 
-Read a skill file only when you reach its stage. Stages in order: plan (until Gate 1), build, review (until Gate 2), done (after Gate 2: before `siding next` starts another cycle, and before `siding done`).
+Read a skill file only when you reach its stage. A skill marked *only if* is loaded only when the task matches; judge that from `prd.md`. Stages in order: plan (until Gate 1), build, review (until Gate 2), done (after Gate 2: before `siding next` starts another cycle, and before `siding done`).
 
 | Stage | Skill | File |
 | --- | --- | --- |
-{{range .Skills}}| {{.Stage}} | {{.Name}} | `{{.Path}}` |
+{{range .Skills}}| {{.Stage}} | {{.Name}}{{with .When}} (*only if* {{.}}){{end}} | `{{.Path}}` |
 {{end}}
 Retro: at most {{.RetroMax}} proposals.

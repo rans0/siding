@@ -364,7 +364,7 @@ func (w *Workspace) Review(task string) (*Track, error) {
 	return w.New("review-"+task, NewOpts{Repos: repos, Review: &orig})
 }
 
-type skillRef struct{ Stage, Name, Path string }
+type skillRef struct{ Stage, Name, Path, When string }
 
 // WriteAgentFiles generates AGENTS.md (and harness files for installed adapters) in the track.
 func (w *Workspace) WriteAgentFiles(t *Track) error {
@@ -418,11 +418,12 @@ func (w *Workspace) WriteAgentFiles(t *Track) error {
 func (w *Workspace) skillsFor(t *Track) []skillRef {
 	k := func(name string) string { return w.path("knowledge", "skills", name+".md") }
 	var out []skillRef
-	add := func(stage, name, path string) {
+	addWhen := func(stage, name, path, when string) {
 		if _, err := os.Stat(path); err == nil {
-			out = append(out, skillRef{stage, name, path})
+			out = append(out, skillRef{stage, name, path, when})
 		}
 	}
+	add := func(stage, name, path string) { addWhen(stage, name, path, "") }
 	required := func(stage string) {
 		names := make([]string, 0, len(w.Cfg.Required.Skills))
 		for n := range w.Cfg.Required.Skills {
@@ -432,7 +433,7 @@ func (w *Workspace) skillsFor(t *Track) []skillRef {
 		for _, n := range names {
 			s := w.Cfg.Required.Skills[n]
 			if slices.Contains(s.Stages, stage) {
-				add(stage, n, filepath.Join(w.vendorDir(n), s.Path, "SKILL.md"))
+				addWhen(stage, n, filepath.Join(w.vendorDir(n), s.Path, "SKILL.md"), s.When)
 			}
 		}
 	}

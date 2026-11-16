@@ -58,6 +58,9 @@ type Skill struct {
 	Path   string   `toml:"path"`
 	Ref    string   `toml:"ref"`
 	Stages []string `toml:"stages"`
+	// When, e.g. "the task redesigns UI": the skill is listed for its stages, but the agent
+	// loads it only if the task matches. Empty means always.
+	When string `toml:"when"`
 	// ClaudePlugin, e.g. "ponytail@ponytail": the vendored checkout is also a Claude Code
 	// marketplace, and the plugin (with its hooks) is enabled inside tracks only.
 	ClaudePlugin string `toml:"claude_plugin"`
@@ -354,11 +357,42 @@ func (w *Workspace) FetchSkills() error {
 		dir := w.vendorDir(name)
 		os.RemoveAll(dir)
 		os.MkdirAll(filepath.Dir(dir), 0o755)
-		if _, err := git(w.Root, "-c", "advice.detachedHead=false", "clone", "-q", "--depth", "1", "--branch", s.Ref, url, dir); err != nil {
+		if err := fetchRef(w.Root, url, s.Ref, dir); err != nil {
 			errs = append(errs, fmt.Errorf("skill %s: %w", name, err))
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// fetchRef checks out ref of url into dir, shallow. A branch or tag is cloned by name; a full
+// commit SHA (for upstreams without release tags) is fetched directly.
+func fetchRef(root, url, ref, dir string) error {
+	if !isSHA(ref) {
+		_, err := git(root, "-c", "advice.detachedHead=false", "clone", "-q", "--depth", "1", "--branch", ref, url, dir)
+		return err
+	}
+	for _, args := range [][]string{
+		{"init", "-q", dir},
+		{"-C", dir, "fetch", "-q", "--depth", "1", url, ref},
+		{"-C", dir, "-c", "advice.detachedHead=false", "checkout", "-q", "FETCH_HEAD"},
+	} {
+		if _, err := git(root, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func isSHA(s string) bool {
+	if len(s) != 40 {
+		return false
+	}
+	for _, c := range s {
+		if !strings.ContainsRune("0123456789abcdef", c) {
+			return false
+		}
+	}
+	return true
 }
 
 func git(dir string, args ...string) (string, error) {

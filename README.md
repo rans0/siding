@@ -166,6 +166,7 @@ rtk = { check = "rtk init -g --show", expect = "Hook: rtk hook", setup = "rtk in
 [required.skills]
 brainstorm = { source = "github:obra/superpowers", path = "skills/brainstorming", ref = "v6.4.2", stages = ["plan"] }
 ponytail   = { source = "github:DietrichGebert/ponytail", path = "skills/ponytail", ref = "v4.10.0", stages = ["build", "review"], claude_plugin = "ponytail@ponytail" }
+unslop     = { source = "github:heydamir/unslop", path = "skills/unslop", ref = "620163eedb3529d9cd23a3994ed8d287d06f760d", stages = ["build"], when = "the task redesigns or polishes UI", claude_plugin = "unslop@heydamir" }
 ```
 
 `.siding.local.toml`:
@@ -178,7 +179,7 @@ agent = "claude"               # what `siding open` starts
 
 Each track gets a port slot (the lowest free one). Its worktrees get a `.env`: the main clone's `.env` with every `env_ports` key set to `port + slot * port_stride`, plus `COMPOSE_PROJECT_NAME=track-<task>`. The generated `.env` is excluded from git in that worktree. So three tracks of `web` run on 3000, 3100 and 3200.
 
-Required skills are fetched at their pinned ref by `siding adapter install`. `siding new` refuses to create a track while any required tool or skill is missing.
+Required skills are fetched at their pinned ref by `siding adapter install`. `ref` is a tag, a branch or a full commit SHA (for upstreams without release tags). A skill with `when` is listed in `AGENTS.md` as *only if* that condition holds, and the agent loads it only for tasks whose PRD matches, so a redesign skill stays out of ordinary feature work. `siding new` refuses to create a track while any required tool or skill is missing.
 
 ## Harness support
 
