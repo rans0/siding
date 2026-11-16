@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -394,5 +395,46 @@ func TestAdopt(t *testing.T) {
 	rc, err := w.New("rc", NewOpts{Repos: []string{"app"}, Branch: "rc/promo"})
 	if err != nil || rc.Adopt {
 		t.Fatal("--branch without --docs marked adopted", err)
+	}
+}
+
+func TestStacks(t *testing.T) {
+	ws := t.TempDir()
+	if err := Init(ws); err != nil {
+		t.Fatal(err)
+	}
+	w, err := Open(ws)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]map[string]string{
+		"web": {"package.json": `{"dependencies":{"next":"15.0.0"}}`, "tsconfig.json": "{}"},
+		"api": {"go.mod": "module api", "composer.json": `{"require":{"php":"^8.3"}}`},
+		"svc": {"composer.json": `{"require":{"laravel/framework":"^11.0"}}`, "Cargo.toml": "", "pom.xml": "", "requirements.txt": ""},
+	}
+	tr := &Track{Task: "t"}
+	for repo, fs := range files {
+		dir := filepath.Join(w.trackDir("t"), repo)
+		os.MkdirAll(dir, 0o755)
+		for name, body := range fs {
+			os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644)
+		}
+		tr.Repos = append(tr.Repos, TrackRepo{Name: repo})
+	}
+	want := []string{"go", "node", "typescript", "nextjs", "python", "rust", "java", "laravel"}
+	if got := w.stacks(tr); !slices.Equal(got, want) {
+		t.Fatalf("stacks = %v, want %v", got, want)
+	}
+	if got := w.stacks(&Track{Task: "t", Repos: []TrackRepo{{Name: "api"}}}); !slices.Equal(got, []string{"go"}) {
+		t.Fatalf("composer.json without laravel/framework: %v", got)
+	}
+	var names []string
+	for _, s := range w.skillsFor(&Track{Task: "t", Repos: []TrackRepo{{Name: "web"}}}) {
+		if s.Stage == "review" {
+			names = append(names, s.Name)
+		}
+	}
+	if want := []string{"review", "review-node", "review-typescript", "review-nextjs", "review-security", "review-database"}; !slices.Equal(names, want) {
+		t.Fatalf("review skills = %v", names)
 	}
 }

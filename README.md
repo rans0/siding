@@ -45,7 +45,7 @@ siding done add-promo                      # after log.md is written
 1. **Start.** `siding new add-promo backend,web`, then `siding open add-promo`. The agent reads `AGENTS.md` in the track: rules, repos, repo facts, and the skills for its stage.
 2. **PRD.** The agent asks you questions, one at a time, until the design is settled, then writes `docs/<date>_add-promo/prd.md`, runs `siding submit add-promo` and stops at Gate 1.
 3. **Gate 1 (you).** Read the PRD on the board or in your editor. `siding approve add-promo` to continue, or `siding approve add-promo --back` and tell the agent what to change.
-4. **Build.** The agent plans, writes tests and code in `tracks/add-promo/<repo>`, leaves the changes uncommitted, runs `siding submit add-promo` and stops at Gate 2.
+4. **Build.** The agent plans, writes tests and code in `tracks/add-promo/<repo>`, then reviews its own diff with fresh context against checklists picked for each repo's stack (Go, Node.js, TypeScript, Next.js, Python, Rust, Java, Laravel) plus security and database. It leaves the changes uncommitted, runs `siding submit add-promo` and stops at Gate 2.
 5. **Gate 2 (you).** Review the diff on the board or with `siding report add-promo`. Approve, or send it back.
 6. **Ship.** `siding pr add-promo` commits, pushes and opens one PR per repo.
 7. **Retro.** The agent writes `log.md` and lesson proposals to `knowledge/inbox/`. Review them with `siding learn` or on the board's Inbox.
@@ -140,6 +140,7 @@ Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified
 ├── knowledge/
 │   ├── rules/             # always loaded into AGENTS.md
 │   ├── skills/            # loaded per stage: prd, workflow, tdd, diagnose, review, hotfix, cross-repo, retro, deep-review, adopt
+│   │                      #   review-<stack>.md loaded at review per detected stack (go, node, typescript, nextjs, python, rust, java, laravel), plus review-security and review-database
 │   ├── repos/<repo>.md    # per-repo facts, included in AGENTS.md
 │   ├── glossary.md        # domain terms, included in every AGENTS.md (created by the first accepted term)
 │   └── inbox/             # lesson proposals from retros

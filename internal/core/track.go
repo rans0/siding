@@ -455,7 +455,55 @@ func (w *Workspace) skillsFor(t *Track) []skillRef {
 	}
 	required("build")
 	add("review", "review", k("review"))
+	for _, s := range w.stacks(t) {
+		add("review", "review-"+s, k("review-"+s))
+	}
+	add("review", "review-security", k("review-security"))
+	add("review", "review-database", k("review-database"))
 	required("review")
 	add("done", "retro", k("retro"))
 	return out
+}
+
+// stackMarkers maps a review checklist to files whose presence at a repo's root means
+// the repo uses that stack. A "file:text" marker also needs text inside the file.
+var stackMarkers = []struct {
+	stack   string
+	markers []string
+}{
+	{"go", []string{"go.mod"}},
+	{"node", []string{"package.json"}},
+	{"typescript", []string{"tsconfig.json"}},
+	{"nextjs", []string{"package.json:\"next\""}},
+	{"python", []string{"pyproject.toml", "requirements.txt", "setup.py"}},
+	{"rust", []string{"Cargo.toml"}},
+	{"java", []string{"pom.xml", "build.gradle", "build.gradle.kts"}},
+	{"laravel", []string{"composer.json:\"laravel/framework\""}},
+}
+
+// stacks lists the review checklists that apply to any of the track's worktrees, in
+// stackMarkers order. ponytail: root markers only; a monorepo with stacks in subfolders
+// gets none of them until we walk one level down.
+func (w *Workspace) stacks(t *Track) []string {
+	var out []string
+	for _, sm := range stackMarkers {
+		for _, r := range t.Repos {
+			if hasMarker(filepath.Join(w.trackDir(t.Task), r.Name), sm.markers) {
+				out = append(out, sm.stack)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func hasMarker(dir string, markers []string) bool {
+	for _, m := range markers {
+		name, text, _ := strings.Cut(m, ":")
+		b, err := os.ReadFile(filepath.Join(dir, name))
+		if err == nil && strings.Contains(string(b), text) {
+			return true
+		}
+	}
+	return false
 }
