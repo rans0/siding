@@ -34,6 +34,13 @@ Work on this task started before siding. Its existing docs, if any, are in the t
 {{range .Rules}}
 {{.}}
 {{end}}
+{{- with .Glossary}}
+## Glossary
+
+Use these terms in code, docs and questions; don't invent synonyms.
+
+{{.}}
+{{end}}
 {{- range .Repos}}{{if .Notes}}
 ## Notes: {{.Name}}
 

@@ -43,7 +43,7 @@ siding done add-promo                      # after log.md is written
 ## A task, start to finish
 
 1. **Start.** `siding new add-promo backend,web`, then `siding open add-promo`. The agent reads `AGENTS.md` in the track: rules, repos, repo facts, and the skills for its stage.
-2. **PRD.** The agent writes `docs/<date>_add-promo/prd.md`, runs `siding submit add-promo` and stops at Gate 1.
+2. **PRD.** The agent asks you questions, one at a time, until the design is settled, then writes `docs/<date>_add-promo/prd.md`, runs `siding submit add-promo` and stops at Gate 1.
 3. **Gate 1 (you).** Read the PRD on the board or in your editor. `siding approve add-promo` to continue, or `siding approve add-promo --back` and tell the agent what to change.
 4. **Build.** The agent plans, writes tests and code in `tracks/add-promo/<repo>`, leaves the changes uncommitted, runs `siding submit add-promo` and stops at Gate 2.
 5. **Gate 2 (you).** Review the diff on the board or with `siding report add-promo`. Approve, or send it back.
@@ -125,7 +125,7 @@ Before `done`, the agent's retro writes up to `retro_max` lesson proposals to `k
       (a)ccept  (e)dit  (s)kip  (d)elete >
 ```
 
-Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified <commit> <track> <date> -->` marker, and every later track touching that repo gets them in its `AGENTS.md`. A proposal with `repo: skill:<name>` becomes `knowledge/skills/<name>.md`, or is appended to it if the skill exists; one with `repo: rule:<name>` is appended to `knowledge/rules/<name>.md`, loaded into every track. Agents also propose a lesson as soon as you state a standing preference mid-session, so `siding learn` can pick it up before the task ends. `siding doctor` flags a fact as stale when a backticked path in it (containing `/`) no longer exists in the repo's main clone.
+Accepted facts are appended to `knowledge/repos/<repo>.md` with a `<!-- verified <commit> <track> <date> -->` marker, and every later track touching that repo gets them in its `AGENTS.md`. A proposal with `repo: skill:<name>` becomes `knowledge/skills/<name>.md`, or is appended to it if the skill exists; one with `repo: rule:<name>` is appended to `knowledge/rules/<name>.md`, loaded into every track; one with `repo: glossary` is appended to `knowledge/glossary.md`, also loaded into every track so agents and you use the same domain terms. Agents also propose a lesson as soon as you state a standing preference mid-session, so `siding learn` can pick it up before the task ends. `siding doctor` flags a fact as stale when a backticked path in it (containing `/`) no longer exists in the repo's main clone.
 
 ## Workspace layout
 

@@ -31,10 +31,11 @@ func TestLearnAndDoctor(t *testing.T) {
 	write("3.md", "---\nrepo: skill:debug\ntrack: promo\n---\n# debug\nBisect first.\n")
 	write("4.md", "---\nrepo: nope\n---\nx\n")
 	write("6.md", "---\nrepo: skill:debug\ntrack: promo\ndate: 2026-09-28\n---\nPrint the seed.\n")
+	write("8.md", "---\nrepo: glossary\ntrack: promo\ndate: 2026-09-28\n---\n**Voucher**: a single-use code; not a promo.\n")
 	write("5.md", "---\nrule: style\ntrack: promo\ndate: 2026-09-28\n---\nNo comments that restate code.\n") // the slip agents make
 
 	props, err := w.Inbox()
-	if err != nil || len(props) != 6 || props[0].Repo != "backend" || props[0].Commit != "a1b2c3d" {
+	if err != nil || len(props) != 7 || props[0].Repo != "backend" || props[0].Commit != "a1b2c3d" {
 		t.Fatalf("inbox %+v %v", props, err)
 	}
 	if _, err := w.Accept("1.md", ""); err != nil {
@@ -47,6 +48,9 @@ func TestLearnAndDoctor(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := w.Accept("6.md", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Accept("8.md", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.Accept("5.md", ""); err != nil {
@@ -73,6 +77,9 @@ func TestLearnAndDoctor(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(ws, "knowledge/skills/debug.md")); string(b) != "# debug\nBisect first.\n\n- Print the seed. <!-- verified promo 2026-09-28 -->\n" {
 		t.Fatalf("skill:\n%s", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(ws, "knowledge/glossary.md")); string(b) != "# Glossary\n\n- **Voucher**: a single-use code; not a promo. <!-- verified promo 2026-09-28 -->\n" {
+		t.Fatalf("glossary:\n%s", b)
 	}
 	if b, _ := os.ReadFile(filepath.Join(ws, "knowledge/rules/style.md")); string(b) != "- No comments that restate code. <!-- verified promo 2026-09-28 -->\n" {
 		t.Fatalf("rule:\n%s", b)

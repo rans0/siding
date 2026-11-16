@@ -62,6 +62,7 @@ func TestLifecycle(t *testing.T) {
 		t.Fatal("unknown repo accepted")
 	}
 
+	os.WriteFile(filepath.Join(ws, "knowledge", "glossary.md"), []byte("- **Voucher**: single-use code.\n"), 0o644)
 	tr, err := w.New("feat", NewOpts{Repos: []string{"app"}})
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +79,7 @@ func TestLifecycle(t *testing.T) {
 	}
 	os.Remove(filepath.Join(wt, ".setup-ran"))
 	agents, _ := os.ReadFile(filepath.Join(ws, "tracks/feat/AGENTS.md"))
-	for _, want := range []string{"me/feat", "run `make test`", "Two gates", filepath.Join("knowledge", "skills", "prd.md")} {
+	for _, want := range []string{"me/feat", "run `make test`", "Two gates", filepath.Join("knowledge", "skills", "prd.md"), filepath.Join("knowledge", "skills", "diagnose.md"), "## Glossary", "**Voucher**"} {
 		if !strings.Contains(string(agents), want) {
 			t.Errorf("AGENTS.md missing %q:\n%s", want, agents)
 		}
